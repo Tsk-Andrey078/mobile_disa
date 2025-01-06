@@ -10,8 +10,25 @@ from django.contrib.auth.hashers import make_password
 from .twilio_service import send_verification_code, check_verification_code
 from .models import CustomUser
 from .serializer import CustomTokenObtainPairSerializer
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 class SendVerificationCodeView(APIView):
+    @swagger_auto_schema(
+        operation_description="Отправка кода подтверждения на номер телефона",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'phone_number': openapi.Schema(type=openapi.TYPE_STRING, description="Номер телефона")
+            },
+            required=['phone_number']  # Указываем обязательные поля
+        ),
+        responses={
+            200: 'Код отправлен успешно',
+            400: 'Номер телефона обязателен',
+            500: 'Ошибка при отправке кода'
+        }
+    )
     def post(self, request):
         phone_number = request.data.get('phone_number')
         if not phone_number:
@@ -23,6 +40,24 @@ class SendVerificationCodeView(APIView):
         return Response({"error": "Ошибка при отправке кода"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class VerifyCodeAndRegisterView(APIView):
+    @swagger_auto_schema(
+        operation_description="Проверка кода и регистрация нового пользователя",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'phone_number': openapi.Schema(type=openapi.TYPE_STRING, description="Номер телефона"),
+                'code': openapi.Schema(type=openapi.TYPE_STRING, description="Код подтверждения"),
+                'full_name': openapi.Schema(type=openapi.TYPE_STRING, description="Полное имя пользователя"),
+                'password': openapi.Schema(type=openapi.TYPE_STRING, description="Пароль пользователя")
+            },
+            required=['phone_number', 'code', 'full_name', 'password']  # Указываем обязательные поля
+        ),
+        responses={
+            201: 'Пользователь успешно зарегистрирован',
+            400: 'Неверный код или обязательные поля отсутствуют',
+            500: 'Ошибка при создании пользователя'
+        }
+    )
     def post(self, request):
         phone_number = request.data.get('phone_number')
         code = request.data.get('code')
@@ -59,7 +94,21 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
 class RegisterDeviceView(APIView):
-    permission_classes = [IsAuthenticated]
+    @swagger_auto_schema(
+        operation_description="Регистрация устройства для получения уведомлений",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'registration_id': openapi.Schema(type=openapi.TYPE_STRING, description="Id девайса или что то блэд в этом роде"),
+                'type': openapi.Schema(type=openapi.TYPE_STRING, description="Тест на яблокофон")
+            },
+            required=['registration_id', 'type']  # Указываем обязательные поля
+        ),
+        responses={
+            200: 'Устройство успешно зарегистрировано',
+            400: 'Token и type обязательны'
+        }
+    )
 
     def post(self, request):
         token = request.data.get("registration_id")
