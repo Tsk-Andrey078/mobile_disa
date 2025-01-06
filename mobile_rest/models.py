@@ -42,6 +42,7 @@ class CustomUser(AbstractUser):
         help_text="Specific permissions for this user.",
         related_query_name="customuser",
     )
+    objects = CustomUserManager()
 
     username = None  # Убираем стандартное поле username
     USERNAME_FIELD = 'phone_number'
