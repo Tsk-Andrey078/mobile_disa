@@ -50,3 +50,13 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.phone_number
+    
+class MediaFiles(models.Model):
+    id = models.AutoField(primary_key=True)
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    video_file = models.FileField(upload_to='/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title

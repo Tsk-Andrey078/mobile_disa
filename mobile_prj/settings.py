@@ -162,6 +162,20 @@ USE_I18N = True
 
 USE_TZ = True
 
+# Настройки для использования R2 с django-storages
+AWS_ACCESS_KEY_ID = config('CLOUDFLARE_R2_ACCESS_KEY')
+AWS_SECRET_ACCESS_KEY = config('CLOUDFLARE_R2_SECRET_KEY')
+AWS_STORAGE_BUCKET_NAME = config('CLOUDFLARE_R2_BUCKET_NAME')
+AWS_S3_REGION_NAME = 'auto'  # R2 автоматически выбирает регион
+AWS_S3_ENDPOINT_URL = 'https://f0e3fa6acf7b8575cbf0ed18230fc9f2.r2.cloudflarestorage.com/video'  # URL вашего R2 хранилища
+AWS_DEFAULT_ACL = None  # Если не нужно устанавливать публичные права доступа
+
+# Устанавливаем использование S3 для хранения медиа файлов
+DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+# Для видео можно также настроить отдельный путь
+MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.r2.cloudflarestorage.com/'
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
