@@ -15,4 +15,4 @@ RUN pip3 install -r requirements.txt
 EXPOSE 8000
 
 # Запуск приложения
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "ali_rest.wsgi:application"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "mobile_prj.wsgi:application"]
