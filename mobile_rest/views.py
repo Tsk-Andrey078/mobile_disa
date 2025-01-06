@@ -2,6 +2,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.views import TokenObtainPairView
+from fcm_django.models import FCMDevice
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.hashers import make_password
 from .twilio_service import send_verification_code, check_verification_code
 from .models import CustomUser
@@ -53,3 +57,24 @@ class VerifyCodeAndRegisterView(APIView):
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+
+class RegisterDeviceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        token = request.data.get("registration_id")
+        device_type = request.data.get("type")  # Например, "ios" или "android"
+
+        if not token or not device_type:
+            return Response({"error": "Token and type are required"}, status=400)
+
+        device, created = FCMDevice.objects.get_or_create(
+            user=request.user,
+            registration_id=token,
+            type=device_type,
+        )
+        if not created:
+            device.save()
+
+        return Response({"message": "Device registered successfully"})
+    
