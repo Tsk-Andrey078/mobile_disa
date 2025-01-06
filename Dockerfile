@@ -10,10 +10,10 @@ COPY . /app
 # Устанавливаем зависимости
 RUN pip3 install -r requirements.txt
 
+RUN python manage.py collectstatic --noinput
 
 # Открываем порт 8000 для доступа
 EXPOSE 8000
 
-CMD ["python", "manage.py", "collectstatic"]
 # Запуск приложения
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "mobile_prj.wsgi:application"]
