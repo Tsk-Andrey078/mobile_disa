@@ -31,7 +31,7 @@ SECRET_KEY = 'django-insecure-#uied7d2d4va9@h&-q^qo)v^$o#5mmgx^_8nn8%fw@!b)n@)0k
 DEBUG = True
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'm.foxminded.space']
-
+CSRF_TRUSTED_ORIGINS = ['https://m.foxminded.space']
 # Application definition
 
 INSTALLED_APPS = [
@@ -165,9 +165,11 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
-
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATIC_URL = 'static/'
-
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
