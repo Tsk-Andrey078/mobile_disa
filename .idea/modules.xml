@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<project version="4">
-  <component name="ProjectModuleManager">
-    <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/mobile_disa.iml" filepath="$PROJECT_DIR$/.idea/mobile_disa.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../qorgay-city/.idea/qorgay-city.iml" filepath="$PROJECT_DIR$/../qorgay-city/.idea/qorgay-city.iml" />
-    </modules>
-  </component>
-</project>
