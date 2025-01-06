@@ -30,8 +30,7 @@ SECRET_KEY = 'django-insecure-#uied7d2d4va9@h&-q^qo)v^$o#5mmgx^_8nn8%fw@!b)n@)0k
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'm.foxminded.space']
 
 # Application definition
 
@@ -48,9 +47,8 @@ INSTALLED_APPS = [
     'mobile_rest.apps.MobileRestConfig',
 ]
 
-""" CORS_ALLOWED_ORIGINS = [
-    
-] """
+# CORS_ALLOWED_ORIGINS = [
+# ]
 CORS_ALLOW_ALL_ORIGINS = True
 # Application definition
 CORS_ALLOW_METHODS = [
