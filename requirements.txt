@@ -45,6 +45,7 @@ packaging==24.2
 propcache==0.2.1
 proto-plus==1.25.0
 protobuf==5.29.2
+psycopg2==2.9.9
 pyasn1==0.6.1
 pyasn1_modules==0.4.1
 pycparser==2.22
@@ -54,14 +55,17 @@ python-dateutil==2.9.0.post0
 python-decouple==3.8
 pytz==2024.2
 PyYAML==6.0.2
+raven==6.10.0
 requests==2.32.3
 rsa==4.9
 s3transfer==0.10.4
 six==1.17.0
+sentry-sdk==2.19.2
 sqlparse==0.5.3
 swapper==1.4.0
 twilio==9.4.1
 typing_extensions==4.12.2
 uritemplate==4.1.1
 urllib3==2.3.0
+whitenoise==6.8.2
 yarl==1.18.3

@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser, Group, Permission, BaseUserManager
 from django.db import models
 
+
 class CustomUserManager(BaseUserManager):
     def create_user(self, phone_number, password=None, **extra_fields):
         if not phone_number:
@@ -21,6 +22,7 @@ class CustomUserManager(BaseUserManager):
             raise ValueError("Superuser must have is_superuser=True.")
 
         return self.create_user(phone_number, password, **extra_fields)
+
 
 class CustomUser(AbstractUser):
     phone_number = models.CharField(max_length=15, unique=True)
@@ -50,7 +52,8 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.phone_number
-    
+
+
 class MediaFiles(models.Model):
     id = models.AutoField(primary_key=True)
     city = models.CharField(max_length=255)
