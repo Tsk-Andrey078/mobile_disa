@@ -167,12 +167,13 @@ AWS_ACCESS_KEY_ID = config('CLOUDFLARE_R2_ACCESS_KEY')
 AWS_SECRET_ACCESS_KEY = config('CLOUDFLARE_R2_SECRET_KEY')
 AWS_STORAGE_BUCKET_NAME = config('CLOUDFLARE_R2_BUCKET_NAME')
 AWS_S3_REGION_NAME = 'auto'
-AWS_S3_ENDPOINT_URL = 'https://f0e3fa6acf7b8575cbf0ed18230fc9f2.r2.cloudflarestorage.com/video'  # URL вашего R2 хранилища
+AWS_S3_ENDPOINT_URL = 'https://eb7c40f99404071f577a4767b956cb3a.r2.cloudflarestorage.com'  # URL вашего R2 хранилища
 AWS_DEFAULT_ACL = None
+AWS_S3_SIGNATURE_VERSION = 's3v4'
 
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
-MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.r2.cloudflarestorage.com/'
+MEDIA_URL = 'https://pub-1fab13828bb7459da4bde1903cbc45ca.r2.dev'
 
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
