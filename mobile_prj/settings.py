@@ -173,7 +173,7 @@ AWS_S3_SIGNATURE_VERSION = 's3v4'
 
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
-MEDIA_URL = 'https://pub-1fab13828bb7459da4bde1903cbc45ca.r2.dev'
+MEDIA_URL = 'https://r2.foxminded.space/'
 
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
