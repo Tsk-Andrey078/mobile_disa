@@ -69,7 +69,6 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 MIDDLEWARE = [
-    'mobile_rest.middleware.SentryExceptionMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'raven.contrib.django.raven_compat.middleware.Sentry404CatchMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
