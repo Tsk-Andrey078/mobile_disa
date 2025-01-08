@@ -50,6 +50,7 @@ pyparsing==3.2.1
 python-decouple==3.8
 pytz==2024.2
 PyYAML==6.0.2
+raven==6.10.0
 requests==2.32.3
 rsa==4.9
 sentry-sdk==2.19.2
