@@ -2,6 +2,12 @@ from rest_framework import serializers
 from .models import CustomUser
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from .models import MediaFiles
+
+class MediaFilesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MediaFiles
+        fields = ['id', 'city', 'street', 'description', 'video_file', 'uploaded_at']
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     class Meta:
