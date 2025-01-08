@@ -1,7 +1,9 @@
+import logging
+import sentry_sdk.integrations.django
+
 from pathlib import Path
 from datetime import timedelta
 from decouple import config
-import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 
 TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID')
@@ -35,8 +37,8 @@ INSTALLED_APPS = [
 
 FCM_DJANGO_SETTINGS = {
     "FCM_SERVER_KEY": "YOUR_SERVER_KEY",  # Секретный ключ FCM из Firebase
-    "ONE_DEVICE_PER_USER": False,        # Разрешить несколько устройств на пользователя
-    "DELETE_INACTIVE_DEVICES": True,     # Удалять неактивные устройства
+    "ONE_DEVICE_PER_USER": False,  # Разрешить несколько устройств на пользователя
+    "DELETE_INACTIVE_DEVICES": True,  # Удалять неактивные устройства
 }
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -67,8 +69,10 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 MIDDLEWARE = [
+    'mobile_rest.middleware.SentryExceptionMiddleware',
     'django.middleware.security.SecurityMiddleware',
-     'whitenoise.middleware.WhiteNoiseMiddleware',
+    'raven.contrib.django.raven_compat.middleware.Sentry404CatchMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -109,15 +113,33 @@ DATABASES = {
     }
 }
 
+logging.basicConfig(level=logging.INFO)
+
 sentry_sdk.init(
     dsn=config('SENTRY_DSN'),
-    integrations=[DjangoIntegration()],
+    integrations=[
+        DjangoIntegration(),
+    ],
     traces_sample_rate=1.0,
-    send_default_pii=True,
-    _experiments={
-        "continuous_profiling_auto_start": True,
-    },
 )
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'sentry': {
+            'level': 'ERROR',
+            'class': 'sentry_sdk.integrations.logging.SentryHandler',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['sentry'],
+            'level': 'ERROR',
+            'propagate': True,
+        },
+    },
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {
