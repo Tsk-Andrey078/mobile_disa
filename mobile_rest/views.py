@@ -132,16 +132,20 @@ class MediaFileUploadView(APIView):
     parser_classes = (MultiPartParser, FormParser)
     @swagger_auto_schema(
         operation_description="Регистрация устройства для получения уведомлений",
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'city': openapi.Schema(type=openapi.TYPE_STRING, description="Город"),
-                'street': openapi.Schema(type=openapi.TYPE_STRING, description="Улица"),
-                'description': openapi.Schema(type=openapi.TYPE_STRING, description="Описание"),
-                'video_file': openapi.Schema(type=openapi.TYPE_STRING, description="Видео файл")
-            },
-            required=['registration_id', 'type']  # Указываем обязательные поля
-        ),
+        manual_parameters=[
+            openapi.Parameter(
+                'city', openapi.IN_FORM, description="Город", type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                'street', openapi.IN_FORM, description="Улица", type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                'description', openapi.IN_FORM, description="Описание", type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                'video_file', openapi.IN_FORM, description="Видео файл", type=openapi.TYPE_FILE
+            ),
+        ],
         responses={
             200: 'Загрузка успешно завершена',
             400: 'Чего то не хватает'
