@@ -174,3 +174,8 @@ class MediaFileUploadView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def get(self, request, *args, **kwargs):
+        data = MediaFiles.objects.get(id = request.query_params.get('id'))
+        serializer = MediaFilesSerializer(data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
