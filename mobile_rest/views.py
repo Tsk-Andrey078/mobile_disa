@@ -8,7 +8,7 @@ from django.contrib.auth.hashers import make_password
 from sentry_sdk import capture_exception
 
 from .twilio_service import send_verification_code, check_verification_code
-from .models import CustomUser, MediaFiles
+from .models import CustomUser, MediaFiles, MediaFile
 from .serializer import CustomTokenObtainPairSerializer, MediaFilesSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
@@ -60,7 +60,7 @@ class VerifyCodeAndRegisterView(APIView):
                 'full_name': openapi.Schema(type=openapi.TYPE_STRING, description="Полное имя пользователя"),
                 'password': openapi.Schema(type=openapi.TYPE_STRING, description="Пароль пользователя")
             },
-            required=['phone_number', 'code', 'full_name', 'password']  # Указываем обязательные поля
+            required=['phone_number', 'code', 'password']  # Указываем обязательные поля
         ),
         responses={
             201: 'Пользователь успешно зарегистрирован',
@@ -88,7 +88,7 @@ class VerifyCodeAndRegisterView(APIView):
 
             # Проверяем, существует ли пользователь
             if CustomUser.objects.filter(phone_number=phone_number).exists():
-                return Response({"message": "Пользователь уже существует"}, status=status.HTTP_200_OK)
+                return Response({"message": "Пользователь уже существует"}, status=status.HTTP_409_CONFLICT)
 
             # Создаем нового пользователя
             user = CustomUser.objects.create(
@@ -140,13 +140,12 @@ class RegisterDeviceView(APIView):
             device.save()
 
         return Response({"message": "Device registered successfully"})
-
-
-class MediaFileUploadView(APIView):
+    
+class MediaFilesUploadView(APIView):
     parser_classes = (MultiPartParser, FormParser)
 
     @swagger_auto_schema(
-        operation_description="Регистрация устройства для получения уведомлений",
+        operation_description="Создание записи с видео или фото",
         manual_parameters=[
             openapi.Parameter(
                 'city', openapi.IN_FORM, description="Город", type=openapi.TYPE_STRING
@@ -158,28 +157,78 @@ class MediaFileUploadView(APIView):
                 'description', openapi.IN_FORM, description="Описание", type=openapi.TYPE_STRING
             ),
             openapi.Parameter(
-                'was_at_date', openapi.IN_FORM, description="Дата проишествия", type=openapi.TYPE_STRING
+                'was_at_date', openapi.IN_FORM, description="Дата происшествия (YYYY-MM-DD)", type=openapi.TYPE_STRING
             ),
             openapi.Parameter(
-                'was_at_time', openapi.IN_FORM, description="Время проишествия", type=openapi.TYPE_STRING
+                'was_at_time', openapi.IN_FORM, description="Время происшествия (HH:MM:SS)", type=openapi.TYPE_STRING
             ),
             openapi.Parameter(
-                'video_file', openapi.IN_FORM, description="Видео файл", type=openapi.TYPE_FILE
+                'video_files', openapi.IN_FORM, description="Видео файлы (можно несколько)", type=openapi.TYPE_FILE, multiple=True
             ),
         ],
         responses={
-            200: 'Загрузка успешно завершена',
-            400: 'Чего то не хватает'
+            201: "Запись успешно создана",
+            400: "Ошибка в данных"
         }
     )
     def post(self, request, *args, **kwargs):
-        serializer = MediaFilesSerializer(data=request.data)
+        data = {
+            'user': request.user,
+            'city': request.data.get('city'),
+            'street': request.data.get('street'),
+            'description': request.data.get('description'),
+            'was_at_date': request.data.get('was_at_date'),
+            'was_at_time': request.data.get('was_at_time'),
+        }
+        serializer = MediaFilesSerializer(data=data)
         if serializer.is_valid():
-            serializer.save()
+            media_instance = serializer.save()
+
+            # Обрабатываем видео файлы
+            video_files = request.FILES.getlist('video_files')
+            for video in video_files:
+                MediaFile.objects.create(media=media_instance, video_file=video)
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+# GET: Получение записи по ID
+class MediaFilesDetailView(APIView):
+    @swagger_auto_schema(
+        operation_description="Получение записи по ID",
+        manual_parameters=[
+            openapi.Parameter(
+                'id', openapi.IN_QUERY, description="ID записи", type=openapi.TYPE_INTEGER
+            ),
+        ],
+        responses={
+            200: MediaFilesSerializer(),
+            404: "Запись не найдена"
+        }
+    )
     def get(self, request, *args, **kwargs):
-        data = MediaFiles.objects.get(id=request.query_params.get('id'))
-        serializer = MediaFilesSerializer(data)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        record_id = request.query_params.get('id')
+        try:
+            media_instance = MediaFiles.objects.get(id=record_id)
+            serializer = MediaFilesSerializer(media_instance)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except MediaFiles.DoesNotExist:
+            return Response({"error": "Запись не найдена"}, status=status.HTTP_404_NOT_FOUND)
+
+
+# GET: Получение списка записей по пользователю
+class MediaFilesListView(APIView):
+    @swagger_auto_schema(
+        operation_description="Получение списка записей по пользователю",
+        responses={
+            200: MediaFilesSerializer(many=True),
+            404: "Записи не найдены"
+        }
+    )
+    def get(self, request, *args, **kwargs):
+        user_id = request.user
+        media_instances = MediaFiles.objects.filter(user=user_id)
+        if media_instances.exists():
+            serializer = MediaFilesSerializer(media_instances, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({"error": "Записи не найдены"}, status=status.HTTP_404_NOT_FOUND)
