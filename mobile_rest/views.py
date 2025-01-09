@@ -157,6 +157,9 @@ class MediaFileUploadView(APIView):
                 'description', openapi.IN_FORM, description="Описание", type=openapi.TYPE_STRING
             ),
             openapi.Parameter(
+                'was_at', openapi.IN_FORM, description="Дата проишествия", type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
                 'video_file', openapi.IN_FORM, description="Видео файл", type=openapi.TYPE_FILE
             ),
         ],
