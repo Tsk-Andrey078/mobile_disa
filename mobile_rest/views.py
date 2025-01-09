@@ -1,11 +1,8 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.views import TokenObtainPairView
 from fcm_django.models import FCMDevice
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.contrib.auth.hashers import make_password
 from sentry_sdk import capture_exception
@@ -38,14 +35,18 @@ class SendVerificationCodeView(APIView):
         if not phone_number:
             return Response({"error": "Номер телефона обязателен"}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            status_code = send_verification_code(phone_number)
-            if status_code:
-                return Response({"message": "Код отправлен успешно"}, status=status.HTTP_200_OK)
-            return Response({"error": "Ошибка при отправке кода"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        except Exception as e:
-            capture_exception(e)
-            return Response({"error": "Ошибка при отправке кода"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # Call the service function to send the verification code
+        result = send_verification_code(phone_number)
+
+        if 'status' in result:  # This means the code was successfully sent
+            return Response({"message": "Код отправлен успешно"}, status=status.HTTP_200_OK)
+
+        # If we get error details, we return them
+        return Response({
+            "error": result.get("error", "Неизвестная ошибка"),
+            "message": result.get("message", "Ошибка при отправке кода"),
+            "error_code": result.get("error_code", "Неизвестный код ошибки")
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class VerifyCodeAndRegisterView(APIView):
@@ -190,7 +191,6 @@ class MediaFilesUploadView(APIView):
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 # GET: Получение записи по ID
 class MediaFilesDetailView(APIView):
