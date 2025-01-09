@@ -142,6 +142,7 @@ class RegisterDeviceView(APIView):
         return Response({"message": "Device registered successfully"})
     
 class MediaFilesUploadView(APIView):
+    permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
 
     @swagger_auto_schema(
@@ -194,6 +195,7 @@ class MediaFilesUploadView(APIView):
 
 # GET: Получение записи по ID
 class MediaFilesDetailView(APIView):
+    permission_classes = [IsAuthenticated]
     @swagger_auto_schema(
         operation_description="Получение записи по ID",
         manual_parameters=[
@@ -218,6 +220,7 @@ class MediaFilesDetailView(APIView):
 
 # GET: Получение списка записей по пользователю
 class MediaFilesListView(APIView):
+    permission_classes = [IsAuthenticated]
     @swagger_auto_schema(
         operation_description="Получение списка записей по пользователю",
         responses={
