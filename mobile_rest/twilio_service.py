@@ -1,4 +1,5 @@
 import sentry_sdk
+import sentry_sdk.scope
 import re
 
 from twilio.rest import Client
@@ -27,7 +28,7 @@ def send_verification_code(phone_number):
     Отправляет код верификации на указанный номер телефона.
     """
     try:
-        verification = client.verify.services(verify_service_sid).verifications.create(
+        verification = client.verify.v2.services(verify_service_sid).verifications.create(
             to=phone_number,
             channel="sms"  # Можно использовать "call" для звонков
         )
@@ -36,7 +37,7 @@ def send_verification_code(phone_number):
 
         cleaned_message = clean_twilio_error_message(str(e))
 
-        with sentry_sdk.push_scope() as scope:
+        with sentry_sdk.isolation_scope() as scope:
             scope.set_extra("phone_number", phone_number)
             scope.set_extra("twilio_error_message", cleaned_message)
             sentry_sdk.capture_exception(e)
@@ -56,7 +57,7 @@ def check_verification_code(phone_number, code, full_name=None):
     Проверяет код подтверждения через Twilio.
     """
     try:
-        verification_check = client.verify.services(verify_service_sid).verification_checks.create(
+        verification_check = client.verify.v2.services(verify_service_sid).verification_checks.create(
             to=phone_number,
             code=code
         )
