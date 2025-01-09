@@ -7,7 +7,7 @@ from .models import MediaFiles
 class MediaFilesSerializer(serializers.ModelSerializer):
     class Meta:
         model = MediaFiles
-        fields = ['id', 'city', 'street', 'description', 'video_file', 'was_at', 'uploaded_at']
+        fields = ['id', 'city', 'street', 'description', 'video_file', 'was_at_date', 'was_at_time', 'uploaded_at']
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     class Meta:
