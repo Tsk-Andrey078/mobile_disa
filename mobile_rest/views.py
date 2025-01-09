@@ -38,14 +38,18 @@ class SendVerificationCodeView(APIView):
         if not phone_number:
             return Response({"error": "Номер телефона обязателен"}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            status_code = send_verification_code(phone_number)
-            if status_code:
-                return Response({"message": "Код отправлен успешно"}, status=status.HTTP_200_OK)
-            return Response({"error": "Ошибка при отправке кода"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        except Exception as e:
-            capture_exception(e)
-            return Response({"error": "Ошибка при отправке кода"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # Call the service function to send the verification code
+        result = send_verification_code(phone_number)
+
+        if 'status' in result:  # This means the code was successfully sent
+            return Response({"message": "Код отправлен успешно"}, status=status.HTTP_200_OK)
+
+        # If we get error details, we return them
+        return Response({
+            "error": result.get("error", "Неизвестная ошибка"),
+            "message": result.get("message", "Ошибка при отправке кода"),
+            "error_code": result.get("error_code", "Неизвестный код ошибки")
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class VerifyCodeAndRegisterView(APIView):
@@ -177,8 +181,8 @@ class MediaFileUploadView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     def get(self, request, *args, **kwargs):
-        data = MediaFiles.objects.get(id = request.query_params.get('id'))
+        data = MediaFiles.objects.get(id=request.query_params.get('id'))
         serializer = MediaFilesSerializer(data)
         return Response(serializer.data, status=status.HTTP_200_OK)
