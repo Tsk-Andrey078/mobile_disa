@@ -2,13 +2,20 @@ from rest_framework import serializers
 from .models import CustomUser
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import MediaFiles
+from .models import MediaFiles, MediaFile
+
+class MediaFileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MediaFile
+        fields = ['id', 'video_file']
 
 class MediaFilesSerializer(serializers.ModelSerializer):
+    videos = MediaFileSerializer(many=True)
+
     class Meta:
         model = MediaFiles
-        fields = ['id', 'city', 'street', 'description', 'video_file', 'was_at_date', 'was_at_time', 'uploaded_at']
-
+        fields = ['id', 'user', 'city', 'street', 'description', 'was_at_date', 'was_at_time', 'uploaded_at', 'videos']
+        
 class UserRegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser

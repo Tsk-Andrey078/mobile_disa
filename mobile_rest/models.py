@@ -26,7 +26,7 @@ class CustomUserManager(BaseUserManager):
 
 class CustomUser(AbstractUser):
     phone_number = models.CharField(max_length=15, unique=True)
-    full_name = models.CharField(max_length=255)
+    full_name = models.CharField(max_length=255, default=None, blank=True, null=True)
 
     groups = models.ManyToManyField(
         Group,
@@ -54,12 +54,17 @@ class CustomUser(AbstractUser):
         return self.phone_number
 
 
+class MediaFile(models.Model):
+    id = models.AutoField(primary_key=True)
+    media = models.ForeignKey('MediaFiles', on_delete=models.CASCADE, related_name='videos')
+    video_file = models.FileField(upload_to='video/')
+
 class MediaFiles(models.Model):
     id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     city = models.CharField(max_length=255)
     street = models.CharField(max_length=255)
     description = models.TextField()
-    video_file = models.FileField(upload_to='video/')
     was_at_date = models.DateField()
     was_at_time = models.TimeField()
     uploaded_at = models.DateTimeField(auto_now_add=True)
