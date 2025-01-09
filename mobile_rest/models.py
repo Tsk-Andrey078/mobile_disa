@@ -60,6 +60,7 @@ class MediaFiles(models.Model):
     street = models.CharField(max_length=255)
     description = models.TextField()
     video_file = models.FileField(upload_to='video/')
-    was_at = models.DateTimeField()
+    was_at_date = models.DateField()
+    was_at_time = models.TimeField()
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
