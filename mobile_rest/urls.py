@@ -1,5 +1,6 @@
 from django.urls import path
-from .views import SendVerificationCodeView, VerifyCodeAndRegisterView, CustomTokenObtainPairView, RegisterDeviceView, MediaFilesUploadView, MediaFilesListView, MediaFilesDetailView
+from .views import SendVerificationCodeView, VerifyCodeAndRegisterView, CustomTokenObtainPairView, RegisterDeviceView, \
+    MediaFilesUploadView, MediaFilesListView, MediaFilesDetailView, CheckToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
@@ -18,8 +19,10 @@ schema_view = get_schema_view(
     permission_classes=(permissions.AllowAny,),
 )
 
+
 def trigger_error(request):
     division_by_zero = 1 / 0
+
 
 urlpatterns = [
     path('sentry-debug/', trigger_error),
@@ -33,4 +36,5 @@ urlpatterns = [
     path('mediafiles/upload/', MediaFilesUploadView.as_view(), name='mediafiles-upload'),
     path('mediafiles/detail/', MediaFilesDetailView.as_view(), name='mediafiles-detail'),
     path('mediafiles/list/', MediaFilesListView.as_view(), name='mediafiles-list'),
+    path('check-token', CheckToken.as_view(), name='check-token')
 ]

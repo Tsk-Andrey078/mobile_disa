@@ -143,7 +143,8 @@ class RegisterDeviceView(APIView):
             device.save()
 
         return Response({"message": "Device registered successfully"})
-    
+
+
 class MediaFilesUploadView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
@@ -167,7 +168,8 @@ class MediaFilesUploadView(APIView):
                 'was_at_time', openapi.IN_FORM, description="Время происшествия (HH:MM:SS)", type=openapi.TYPE_STRING
             ),
             openapi.Parameter(
-                'video_files', openapi.IN_FORM, description="Видео файлы (можно несколько)", type=openapi.TYPE_FILE, multiple=True
+                'video_files', openapi.IN_FORM, description="Видео файлы (можно несколько)", type=openapi.TYPE_FILE,
+                multiple=True
             ),
         ],
         responses={
@@ -196,9 +198,11 @@ class MediaFilesUploadView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 # GET: Получение записи по ID
 class MediaFilesDetailView(APIView):
     permission_classes = [IsAuthenticated]
+
     @swagger_auto_schema(
         operation_description="Получение записи по ID",
         manual_parameters=[
@@ -224,6 +228,7 @@ class MediaFilesDetailView(APIView):
 # GET: Получение списка записей по пользователю
 class MediaFilesListView(APIView):
     permission_classes = [IsAuthenticated]
+
     @swagger_auto_schema(
         operation_description="Получение списка записей по пользователю",
         responses={
@@ -238,3 +243,24 @@ class MediaFilesListView(APIView):
             serializer = MediaFilesSerializer(media_instances, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response({"error": "Записи не найдены"}, status=status.HTTP_404_NOT_FOUND)
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+from drf_yasg.utils import swagger_auto_schema
+
+
+class CheckToken(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_description="Проверка авторизации",
+        responses={
+            200: "Авторизация успешна",
+            401: "Ошибка авторизации"
+        }
+    )
+    def get(self, request, *args, **kwargs):
+        return Response({"message": "Авторизация успешна"}, status=status.HTTP_200_OK)
