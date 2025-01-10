@@ -7,6 +7,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+from drf_yasg.utils import swagger_auto_schema
 from django.contrib.auth.hashers import make_password
 from sentry_sdk import capture_exception
 
@@ -178,7 +183,7 @@ class MediaFilesUploadView(APIView):
     )
     def post(self, request, *args, **kwargs):
         data = {
-            'user': request.user,
+            'user': request.user.id,
             'city': request.data.get('city'),
             'street': request.data.get('street'),
             'description': request.data.get('description'),
@@ -338,14 +343,6 @@ class CheckToken(APIView):
     )
     def get(self, request, *args, **kwargs):
         return Response({"message": "Авторизация успешна"}, status=status.HTTP_200_OK)
-
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework import status
-from drf_yasg.utils import swagger_auto_schema
-
 
 class CheckToken(APIView):
     permission_classes = [IsAuthenticated]
