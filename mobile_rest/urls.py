@@ -1,6 +1,5 @@
 from django.urls import path
-from .views import SendVerificationCodeView, VerifyCodeAndRegisterView, CustomTokenObtainPairView, RegisterDeviceView, \
-    MediaFilesUploadView, MediaFilesListView, MediaFilesDetailView, CheckToken
+from .views import SendVerificationCodeView, VerifyCodeAndRegisterView, CustomTokenObtainPairView, RegisterDeviceView, MediaFilesUploadView, MediaFilesListView, MediaFilesDetailView, GetNewsListView, GetNewsView, PostNewsView, CheckToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
@@ -36,5 +35,8 @@ urlpatterns = [
     path('mediafiles/upload/', MediaFilesUploadView.as_view(), name='mediafiles-upload'),
     path('mediafiles/detail/', MediaFilesDetailView.as_view(), name='mediafiles-detail'),
     path('mediafiles/list/', MediaFilesListView.as_view(), name='mediafiles-list'),
+    path('news/upload/', PostNewsView.as_view(), name='news-upload'),
+    path('news/detail/', GetNewsView.as_view(), name='news-detail'),
+    path('news/lsit/', GetNewsListView.as_view(), name='news-list'),
     path('check-token', CheckToken.as_view(), name='check-token')
 ]
