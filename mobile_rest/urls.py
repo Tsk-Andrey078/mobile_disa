@@ -37,6 +37,6 @@ urlpatterns = [
     path('mediafiles/list/', MediaFilesListView.as_view(), name='mediafiles-list'),
     path('news/upload/', PostNewsView.as_view(), name='news-upload'),
     path('news/detail/', GetNewsView.as_view(), name='news-detail'),
-    path('news/lsit/', GetNewsListView.as_view(), name='news-list'),
+    path('news/list/', GetNewsListView.as_view(), name='news-list'),
     path('check-token', CheckToken.as_view(), name='check-token')
 ]

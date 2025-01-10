@@ -325,7 +325,7 @@ class GetNewsListView(APIView):
     )
 
     def get(self, request, *args, **kwargs):
-        limit = request.query_params.get('limit')
+        limit = int(request.query_params.get('limit'))
         news = News.objects.all()[:limit]
         serializer = NewsSerializer(news, many = True)
         return Response(serializer.data, status = status.HTTP_200_OK)
@@ -344,15 +344,3 @@ class CheckToken(APIView):
     def get(self, request, *args, **kwargs):
         return Response({"message": "Авторизация успешна"}, status=status.HTTP_200_OK)
 
-class CheckToken(APIView):
-    permission_classes = [IsAuthenticated]
-
-    @swagger_auto_schema(
-        operation_description="Проверка авторизации",
-        responses={
-            200: "Авторизация успешна",
-            401: "Ошибка авторизации"
-        }
-    )
-    def get(self, request, *args, **kwargs):
-        return Response({"message": "Авторизация успешна"}, status=status.HTTP_200_OK)
