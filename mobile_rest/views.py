@@ -38,14 +38,18 @@ class SendVerificationCodeView(APIView):
         if not phone_number:
             return Response({"error": "Номер телефона обязателен"}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            status_code = send_verification_code(phone_number)
-            if status_code:
-                return Response({"message": "Код отправлен успешно"}, status=status.HTTP_200_OK)
-            return Response({"error": "Ошибка при отправке кода"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        except Exception as e:
-            capture_exception(e)
-            return Response({"error": "Ошибка при отправке кода"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # Call the service function to send the verification code
+        result = send_verification_code(phone_number)
+
+        if 'status' in result:  # This means the code was successfully sent
+            return Response({"message": "Код отправлен успешно"}, status=status.HTTP_200_OK)
+
+        # If we get error details, we return them
+        return Response({
+            "error": result.get("error", "Неизвестная ошибка"),
+            "message": result.get("message", "Ошибка при отправке кода"),
+            "error_code": result.get("error_code", "Неизвестный код ошибки")
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class VerifyCodeAndRegisterView(APIView):
@@ -139,7 +143,8 @@ class RegisterDeviceView(APIView):
             device.save()
 
         return Response({"message": "Device registered successfully"})
-    
+
+
 class MediaFilesUploadView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
@@ -196,6 +201,7 @@ class MediaFilesUploadView(APIView):
 # GET: Получение записи по ID
 class MediaFilesDetailView(APIView):
     permission_classes = [IsAuthenticated]
+
     @swagger_auto_schema(
         operation_description="Получение записи по ID",
         manual_parameters=[
@@ -221,6 +227,7 @@ class MediaFilesDetailView(APIView):
 # GET: Получение списка записей по пользователю
 class MediaFilesListView(APIView):
     permission_classes = [IsAuthenticated]
+
     @swagger_auto_schema(
         operation_description="Получение списка записей по пользователю",
         responses={
@@ -318,3 +325,37 @@ class GetNewsListView(APIView):
         serializer = NewsSerializer(news, many = True)
         return Response(serializer.data, status = status.HTTP_200_OK)
 
+      
+class CheckToken(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_description="Проверка авторизации",
+        responses={
+            200: "Авторизация успешна",
+            401: "Ошибка авторизации"
+        }
+    )
+    def get(self, request, *args, **kwargs):
+        return Response({"message": "Авторизация успешна"}, status=status.HTTP_200_OK)
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+from drf_yasg.utils import swagger_auto_schema
+
+
+class CheckToken(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_description="Проверка авторизации",
+        responses={
+            200: "Авторизация успешна",
+            401: "Ошибка авторизации"
+        }
+    )
+    def get(self, request, *args, **kwargs):
+        return Response({"message": "Авторизация успешна"}, status=status.HTTP_200_OK)

@@ -128,10 +128,14 @@ logging.basicConfig(level=logging.INFO)
 
 sentry_sdk.init(
     dsn=config("SENTRY_DSN"),
+    debug=True,
     integrations=[
-        DjangoIntegration(),
+        DjangoIntegration(middleware_spans=True, signals_spans=True, ),
     ],
+    environment="development",
     traces_sample_rate=1.0,
+    send_default_pii=True,
+    auto_session_tracking=True
 )
 
 LOGGING = {
