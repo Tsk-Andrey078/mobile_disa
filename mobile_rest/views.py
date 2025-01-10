@@ -11,8 +11,8 @@ from django.contrib.auth.hashers import make_password
 from sentry_sdk import capture_exception
 
 from .twilio_service import send_verification_code, check_verification_code
-from .models import CustomUser, MediaFiles, MediaFile
-from .serializer import CustomTokenObtainPairSerializer, MediaFilesSerializer
+from .models import CustomUser, MediaFiles, MediaFile, MediaFileNews, News
+from .serializer import CustomTokenObtainPairSerializer, MediaFilesSerializer, MediaFileNewsSerializer, NewsSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
@@ -163,7 +163,7 @@ class MediaFilesUploadView(APIView):
                 'was_at_time', openapi.IN_FORM, description="Время происшествия (HH:MM:SS)", type=openapi.TYPE_STRING
             ),
             openapi.Parameter(
-                'video_files', openapi.IN_FORM, description="Видео файлы (можно несколько)", type=openapi.TYPE_FILE, multiple=True
+                'videos', openapi.IN_FORM, description="Видео файлы (можно несколько)", type=openapi.TYPE_FILE, multiple=True
             ),
         ],
         responses={
@@ -185,7 +185,7 @@ class MediaFilesUploadView(APIView):
             media_instance = serializer.save()
 
             # Обрабатываем видео файлы
-            video_files = request.FILES.getlist('video_files')
+            video_files = request.FILES.getlist('videos')
             for video in video_files:
                 MediaFile.objects.create(media=media_instance, video_file=video)
 
@@ -235,3 +235,86 @@ class MediaFilesListView(APIView):
             serializer = MediaFilesSerializer(media_instances, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response({"error": "Записи не найдены"}, status=status.HTTP_404_NOT_FOUND)
+    
+class PostNewsView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+    @swagger_auto_schema(
+        operation_description="Создание записи с видео или фото",
+        manual_parameters=[
+            openapi.Parameter(
+                'title', openapi.IN_FORM, description="Заголовок новости(макс = 512символов)", type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                'text', openapi.IN_FORM, description="Текст новости", type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                'media', openapi.IN_FORM, description="Медиа файлы", type=openapi.TYPE_STRING
+            ),
+        ],
+        responses={
+            201: "Запись успешно создана",
+            400: "Ошибка в данных"
+        }
+    )
+
+    def post(self, request, *args, **kwargs):
+        data = {
+            'title': request.data.get('title'),
+            'text': request.data.get('text'),
+        }
+
+        serializer = NewsSerializer(data)
+        if serializer.is_valid():
+            news_instanse = serializer.save()
+            media_files = request.data.getlist('media')
+            for media in media_files:
+                MediaFileNews.objects.create(news = news_instanse, video_file = media)
+            return Response({'message': 'Новость успешно создана'}, status = status.HTTP_201_CREATED)
+        return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)
+    
+class GetNewsView(APIView):
+    permission_classes = [IsAuthenticated]
+    @swagger_auto_schema(
+        operation_description="Получение записи по ID",
+        manual_parameters=[
+            openapi.Parameter(
+                'id', openapi.IN_QUERY, description="ID записи", type=openapi.TYPE_INTEGER
+            ),
+        ],
+        responses={
+            200: NewsSerializer(),
+            404: "Запись не найдена"
+        }
+    )
+
+    def get(self, request, *args, **kwargs):
+        news_id = request.query_params.get('id')
+        try:
+            news = News.objects.get(id = news_id)
+            serializer = NewsSerializer(news)
+            return Response(serializer.data, status = status.HTTP_200_OK)
+        except News.DoesNotExist:
+            return Response({'error': 'Запись не найдена'}, status = status.HTTP_404_NOT_FOUND)
+        
+class GetNewsListView(APIView):
+    permission_classes = [IsAuthenticated]
+    @swagger_auto_schema(
+        operation_description="Получение новостей с начала по лимиту",
+        manual_parameters=[
+            openapi.Parameter(
+                'limit', openapi.IN_QUERY, description="Лимит записей. В query_params", type=openapi.TYPE_INTEGER
+            ),
+        ],
+        responses={
+            200: NewsSerializer(many = True),
+        }
+    )
+
+    def get(self, request, *args, **kwargs):
+        limit = request.query_params.get('limit')
+        news = News.objects.all()[:limit]
+        serializer = NewsSerializer(news, many = True)
+        return Response(serializer.data, status = status.HTTP_200_OK)
+
