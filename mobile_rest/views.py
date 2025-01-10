@@ -190,7 +190,7 @@ class MediaFilesUploadView(APIView):
             'was_at_date': request.data.get('was_at_date'),
             'was_at_time': request.data.get('was_at_time'),
         }
-        serializer = MediaFilesSerializer(data=data)
+        serializer = MediaFilesSerializer(data = data)
         if serializer.is_valid():
             media_instance = serializer.save()
 
@@ -277,10 +277,10 @@ class PostNewsView(APIView):
             'text': request.data.get('text'),
         }
 
-        serializer = NewsSerializer(data)
+        serializer = NewsSerializer(data = data)
         if serializer.is_valid():
             news_instanse = serializer.save()
-            media_files = request.data.getlist('media')
+            media_files = request.FILES.getlist('media')
             for media in media_files:
                 MediaFileNews.objects.create(news = news_instanse, video_file = media)
             return Response({'message': 'Новость успешно создана'}, status = status.HTTP_201_CREATED)
