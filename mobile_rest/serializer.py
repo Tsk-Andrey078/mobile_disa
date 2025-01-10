@@ -10,11 +10,15 @@ class MediaFileNewsSerializer(serializers.ModelSerializer):
         fields = ['id', 'video_file']
 
 class NewsSerializer(serializers.ModelSerializer):
-    media = MediaFileNewsSerializer(many = True)
+    media = serializers.SerializerMethodField()
 
     class Meta:
         model = News
         fields = ['id', 'title', 'text', 'created_at', 'media']
+
+    def get_media(self, obj):
+        media_files = MediaFileNews.objects.filter(news = obj)
+        return MediaFileNewsSerializer(media_files, many = True).data
 
 class MediaFileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -22,11 +26,16 @@ class MediaFileSerializer(serializers.ModelSerializer):
         fields = ['id', 'video_file']
 
 class MediaFilesSerializer(serializers.ModelSerializer):
-    videos = MediaFileSerializer(many=True)
+    videos = serializers.SerializerMethodField()
 
     class Meta:
         model = MediaFiles
         fields = ['id', 'user', 'city', 'street', 'description', 'was_at_date', 'was_at_time', 'uploaded_at', 'videos']
+
+    def get_videos(self, obj):
+        # Возвращаем сериализованные видеофайлы, связанные с текущей записью
+        media_files = MediaFile.objects.filter(media=obj)
+        return MediaFileSerializer(media_files, many=True).data
         
 class UserRegistrationSerializer(serializers.ModelSerializer):
     class Meta:

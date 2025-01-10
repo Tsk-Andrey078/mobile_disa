@@ -199,7 +199,7 @@ class MediaFilesUploadView(APIView):
             for video in video_files:
                 MediaFile.objects.create(media=media_instance, video_file=video)
 
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(MediaFilesSerializer(media_instance).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -283,7 +283,7 @@ class PostNewsView(APIView):
             media_files = request.FILES.getlist('media')
             for media in media_files:
                 MediaFileNews.objects.create(news = news_instanse, video_file = media)
-            return Response({'message': 'Новость успешно создана'}, status = status.HTTP_201_CREATED)
+            return Response(NewsSerializer(news_instanse).data, status = status.HTTP_201_CREATED)
         return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)
     
 class GetNewsView(APIView):
