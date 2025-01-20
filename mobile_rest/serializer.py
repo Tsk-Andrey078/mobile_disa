@@ -1,8 +1,7 @@
 from rest_framework import serializers
-from .models import CustomUser
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import MediaFiles, MediaFile, MediaFileNews, News
+from .models import MediaFiles, MediaFile, MediaFileNews, News, CustomUser
 
 class MediaFileNewsSerializer(serializers.ModelSerializer):
     class Meta:

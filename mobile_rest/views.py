@@ -1,15 +1,10 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
 from rest_framework_simplejwt.views import TokenObtainPairView
 from fcm_django.models import FCMDevice
-from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from django.contrib.auth.hashers import make_password
@@ -17,8 +12,7 @@ from sentry_sdk import capture_exception
 
 from .twilio_service import send_verification_code, check_verification_code
 from .models import CustomUser, MediaFiles, MediaFile, MediaFileNews, News
-from .serializer import CustomTokenObtainPairSerializer, MediaFilesSerializer, MediaFileNewsSerializer, NewsSerializer
-from drf_yasg.utils import swagger_auto_schema
+from .serializer import CustomTokenObtainPairSerializer, MediaFilesSerializer, NewsSerializer
 from drf_yasg import openapi
 
 
@@ -235,6 +229,14 @@ class MediaFilesListView(APIView):
 
     @swagger_auto_schema(
         operation_description="Получение списка записей по пользователю",
+        manual_parameters=[
+            openapi.Parameter(
+                'type', openapi.IN_QUERY, description="Тип запроса. ВСЫЕ или не ВСЫЕ", type=openapi.TYPE_STRING,
+            ),
+            openapi.Parameter(
+                'limit', openapi.IN_QUERY, description="Че надо, и скоко надо", type=openapi.TYPE_STRING,
+            ),
+        ],
         responses={
             200: MediaFilesSerializer(many=True),
             404: "Записи не найдены"
@@ -242,7 +244,13 @@ class MediaFilesListView(APIView):
     )
     def get(self, request, *args, **kwargs):
         user_id = request.user
-        media_instances = MediaFiles.objects.filter(user=user_id)
+        if request.query_params.get("type", None) == None or request.query_params.get("limit", None) == None:
+            return Response({'error': 'Limit and Type is required!'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if request.query_params.get("type") == "user":
+            media_instances = MediaFiles.objects.filter(user=user_id)[:int(request.query_params.get("limit"))]
+        if request.query_params.get("type") == "all":
+            media_instances = MediaFiles.objects.all()[:int(request.query_params.get("limit"))]
         if media_instances.exists():
             serializer = MediaFilesSerializer(media_instances, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
