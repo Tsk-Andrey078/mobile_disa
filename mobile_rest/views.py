@@ -4,27 +4,40 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from django.contrib.auth.hashers import make_password
 from sentry_sdk import capture_exception
+from drf_yasg import openapi
 
 from .twilio_service import send_verification_code, check_verification_code
 from .models import CustomUser, MediaFiles, MediaFile, MediaFileNews, News
-from .serializer import CustomTokenObtainPairSerializer, MediaFilesSerializer, NewsSerializer
-from drf_yasg import openapi
+from .serializer import (
+    CustomTokenObtainPairSerializer,
+    MediaFilesSerializer,
+    NewsSerializer
+)
 
+
+# ===================================
+#   AUTH / REGISTRATION VIEWS
+# ===================================
 
 class SendVerificationCodeView(APIView):
+    """
+    Отправляет код подтверждения на указанный номер телефона.
+    """
     @swagger_auto_schema(
         operation_description="Отправка кода подтверждения на номер телефона",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                'phone_number': openapi.Schema(type=openapi.TYPE_STRING, description="Номер телефона")
+                'phone_number': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Номер телефона"
+                )
             },
-            required=['phone_number']  # Указываем обязательные поля
+            required=['phone_number'],
         ),
         responses={
             200: 'Код отправлен успешно',
@@ -35,38 +48,60 @@ class SendVerificationCodeView(APIView):
     def post(self, request):
         phone_number = request.data.get('phone_number')
         if not phone_number:
-            return Response({"error": "Номер телефона обязателен"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Номер телефона обязателен"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # Call the service function to send the verification code
         result = send_verification_code(phone_number)
+        if 'status' in result:
+            return Response(
+                {"message": "Код подтверждения успешно отправлен"},
+                status=status.HTTP_200_OK
+            )
 
-        if 'status' in result:  # This means the code was successfully sent
-            return Response({"message": "Код отправлен успешно"}, status=status.HTTP_200_OK)
-
-        # If we get error details, we return them
-        return Response({
-            "error": result.get("error", "Неизвестная ошибка"),
-            "message": result.get("message", "Ошибка при отправке кода"),
-            "error_code": result.get("error_code", "Неизвестный код ошибки")
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {
+                "error": result.get("error", "Неизвестная ошибка"),
+                "message": result.get("message", "Ошибка при отправке кода"),
+                "error_code": result.get("error_code", "Неизвестный код ошибки")
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 class VerifyCodeAndRegisterView(APIView):
+    """
+    Проверяет код подтверждения и регистрирует нового пользователя.
+    """
     @swagger_auto_schema(
         operation_description="Проверка кода и регистрация нового пользователя",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                'phone_number': openapi.Schema(type=openapi.TYPE_STRING, description="Номер телефона"),
-                'code': openapi.Schema(type=openapi.TYPE_STRING, description="Код подтверждения"),
-                'full_name': openapi.Schema(type=openapi.TYPE_STRING, description="Полное имя пользователя"),
-                'password': openapi.Schema(type=openapi.TYPE_STRING, description="Пароль пользователя")
+                'phone_number': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Номер телефона"
+                ),
+                'code': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Код подтверждения из SMS"
+                ),
+                'full_name': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="ФИО или имя пользователя"
+                ),
+                'password': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Пароль пользователя"
+                )
             },
-            required=['phone_number', 'code', 'password']  # Указываем обязательные поля
+            required=['phone_number', 'code', 'password']
         ),
         responses={
             201: 'Пользователь успешно зарегистрирован',
             400: 'Неверный код или обязательные поля отсутствуют',
+            409: 'Пользователь уже существует',
             500: 'Ошибка при создании пользователя'
         }
     )
@@ -78,73 +113,106 @@ class VerifyCodeAndRegisterView(APIView):
 
         if not phone_number or not code or not full_name or not password:
             return Response(
-                {"error": "Номер телефона, ФИО, код и пароль обязательны"},
+                {"error": "Необходимо указать номер телефона, код, ФИО и пароль"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
-            # Проверяем код через Twilio
-            is_verified = check_verification_code(phone_number, code)
-            if not is_verified:
-                return Response({"error": "Неверный код"}, status=status.HTTP_400_BAD_REQUEST)
+            if not check_verification_code(phone_number, code):
+                return Response(
+                    {"error": "Указанный код подтверждения неверен"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-            # Проверяем, существует ли пользователь
             if CustomUser.objects.filter(phone_number=phone_number).exists():
-                return Response({"message": "Пользователь уже существует"}, status=status.HTTP_409_CONFLICT)
+                return Response(
+                    {"message": "Пользователь с таким номером уже существует"},
+                    status=status.HTTP_409_CONFLICT
+                )
 
-            # Создаем нового пользователя
-            user = CustomUser.objects.create(
+            CustomUser.objects.create(
                 phone_number=phone_number,
                 full_name=full_name,
-                password=make_password(password)  # Хэшируем пароль
+                password=make_password(password)
             )
-            return Response({"message": "Пользователь успешно зарегистрирован"}, status=status.HTTP_201_CREATED)
+            return Response(
+                {"message": "Пользователь успешно зарегистрирован"},
+                status=status.HTTP_201_CREATED
+            )
         except Exception as e:
             capture_exception(e)
-            return Response({"error": f"Ошибка при создании пользователя: {str(e)}"},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": f"Ошибка при создании пользователя: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
+    """
+    Кастомная JWT-аутентификация с использованием номера телефона.
+    """
     serializer_class = CustomTokenObtainPairSerializer
 
 
 class RegisterDeviceView(APIView):
+    """
+    Регистрация устройства для получения push-уведомлений.
+    """
     @swagger_auto_schema(
-        operation_description="Регистрация устройства для получения уведомлений",
+        operation_description="Регистрация устройства (FCM) для уведомлений",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                'registration_id': openapi.Schema(type=openapi.TYPE_STRING,
-                                                  description="Id девайса или что то блэд в этом роде"),
-                'type': openapi.Schema(type=openapi.TYPE_STRING, description="Тест на яблокофон")
+                'registration_id': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="FCM-токен устройства"
+                ),
+                'type': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Тип устройства (ios / android и т.д.)"
+                )
             },
-            required=['registration_id', 'type']  # Указываем обязательные поля
+            required=['registration_id', 'type']
         ),
         responses={
             200: 'Устройство успешно зарегистрировано',
-            400: 'Token и type обязательны'
+            400: 'Отсутствуют токен или тип устройства'
         }
     )
     def post(self, request):
         token = request.data.get("registration_id")
-        device_type = request.data.get("type")  # Например, "ios" или "android"
+        device_type = request.data.get("type")
 
         if not token or not device_type:
-            return Response({"error": "Token and type are required"}, status=400)
+            return Response(
+                {"error": "Необходимо указать registration_id и type"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         device, created = FCMDevice.objects.get_or_create(
             user=request.user,
             registration_id=token,
-            type=device_type,
+            type=device_type
         )
+        # Если устройство уже существовало, можно обновить информацию
         if not created:
+            device.type = device_type
             device.save()
 
-        return Response({"message": "Device registered successfully"})
+        return Response(
+            {"message": "Устройство успешно зарегистрировано"},
+            status=status.HTTP_200_OK
+        )
 
+
+# ===================================
+#   MEDIA FILES VIEWS
+# ===================================
 
 class MediaFilesUploadView(APIView):
+    """
+    Загрузка медиафайлов (фото/видео).
+    """
     permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
 
@@ -152,27 +220,46 @@ class MediaFilesUploadView(APIView):
         operation_description="Создание записи с видео или фото",
         manual_parameters=[
             openapi.Parameter(
-                'city', openapi.IN_FORM, description="Город", type=openapi.TYPE_STRING
+                'city',
+                openapi.IN_FORM,
+                description="Город происшествия",
+                type=openapi.TYPE_STRING
             ),
             openapi.Parameter(
-                'street', openapi.IN_FORM, description="Улица", type=openapi.TYPE_STRING
+                'street',
+                openapi.IN_FORM,
+                description="Улица происшествия",
+                type=openapi.TYPE_STRING
             ),
             openapi.Parameter(
-                'description', openapi.IN_FORM, description="Описание", type=openapi.TYPE_STRING
+                'description',
+                openapi.IN_FORM,
+                description="Описание происшествия",
+                type=openapi.TYPE_STRING
             ),
             openapi.Parameter(
-                'was_at_date', openapi.IN_FORM, description="Дата происшествия (YYYY-MM-DD)", type=openapi.TYPE_STRING
+                'was_at_date',
+                openapi.IN_FORM,
+                description="Дата (YYYY-MM-DD)",
+                type=openapi.TYPE_STRING
             ),
             openapi.Parameter(
-                'was_at_time', openapi.IN_FORM, description="Время происшествия (HH:MM:SS)", type=openapi.TYPE_STRING
+                'was_at_time',
+                openapi.IN_FORM,
+                description="Время (HH:MM:SS)",
+                type=openapi.TYPE_STRING
             ),
             openapi.Parameter(
-                'videos', openapi.IN_FORM, description="Видео файлы (можно несколько)", type=openapi.TYPE_FILE, multiple=True
+                'videos',
+                openapi.IN_FORM,
+                description="Видео файлы (можно несколько)",
+                type=openapi.TYPE_FILE,
+                multiple=True
             ),
         ],
         responses={
             201: "Запись успешно создана",
-            400: "Ошибка в данных"
+            400: "Ошибка валидации данных"
         }
     )
     def post(self, request, *args, **kwargs):
@@ -184,37 +271,54 @@ class MediaFilesUploadView(APIView):
             'was_at_date': request.data.get('was_at_date'),
             'was_at_time': request.data.get('was_at_time'),
         }
-        serializer = MediaFilesSerializer(data = data)
-        if serializer.is_valid():
-            media_instance = serializer.save()
+        serializer = MediaFilesSerializer(data=data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-            # Обрабатываем видео файлы
-            video_files = request.FILES.getlist('videos')
-            for video in video_files:
-                MediaFile.objects.create(media=media_instance, video_file=video)
+        media_instance = serializer.save()
+        video_files = request.FILES.getlist('videos')
 
-            return Response(MediaFilesSerializer(media_instance).data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        for video in video_files:
+            MediaFile.objects.create(
+                media=media_instance,
+                video_file=video
+            )
+        return Response(
+            MediaFilesSerializer(media_instance).data,
+            status=status.HTTP_201_CREATED
+        )
 
 
-# GET: Получение записи по ID
 class MediaFilesDetailView(APIView):
+    """
+    Получение информации о конкретной записи MediaFiles по ID.
+    """
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
-        operation_description="Получение записи по ID",
+        operation_description="Получение записи MediaFiles по ID",
         manual_parameters=[
             openapi.Parameter(
-                'id', openapi.IN_QUERY, description="ID записи", type=openapi.TYPE_INTEGER
+                'id',
+                openapi.IN_QUERY,
+                description="ID записи",
+                type=openapi.TYPE_INTEGER
             ),
         ],
         responses={
             200: MediaFilesSerializer(),
+            400: "Не указан параметр id",
             404: "Запись не найдена"
         }
     )
     def get(self, request, *args, **kwargs):
         record_id = request.query_params.get('id')
+        if not record_id:
+            return Response(
+                {"error": "Необходимо указать параметр 'id'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
             media_instance = MediaFiles.objects.get(id=record_id)
             serializer = MediaFilesSerializer(media_instance)
@@ -223,132 +327,351 @@ class MediaFilesDetailView(APIView):
             return Response({"error": "Запись не найдена"}, status=status.HTTP_404_NOT_FOUND)
 
 
-# GET: Получение списка записей по пользователю
 class MediaFilesListView(APIView):
+    """
+    Получение списка записей MediaFiles (по пользователю или всех).
+    """
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
-        operation_description="Получение списка записей по пользователю",
+        operation_description="Получение списка записей (по пользователю или всех)",
         manual_parameters=[
             openapi.Parameter(
-                'type', openapi.IN_QUERY, description="Тип запроса. ВСЫЕ или не ВСЫЕ", type=openapi.TYPE_STRING,
+                'type',
+                openapi.IN_QUERY,
+                description="Тип запроса: 'user' или 'all'",
+                type=openapi.TYPE_STRING
             ),
             openapi.Parameter(
-                'limit', openapi.IN_QUERY, description="Че надо, и скоко надо", type=openapi.TYPE_STRING,
+                'limit',
+                openapi.IN_QUERY,
+                description="Количество записей в выборке",
+                type=openapi.TYPE_STRING
             ),
         ],
         responses={
             200: MediaFilesSerializer(many=True),
+            400: "Некорректные параметры запроса",
             404: "Записи не найдены"
         }
     )
     def get(self, request, *args, **kwargs):
-        user_id = request.user
-        if request.query_params.get("type", None) == None or request.query_params.get("limit", None) == None:
-            return Response({'error': 'Limit and Type is required!'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        if request.query_params.get("type") == "user":
-            media_instances = MediaFiles.objects.filter(user=user_id)[:int(request.query_params.get("limit"))]
-        if request.query_params.get("type") == "all":
-            media_instances = MediaFiles.objects.all()[:int(request.query_params.get("limit"))]
-        if media_instances.exists():
-            serializer = MediaFilesSerializer(media_instances, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response({"error": "Записи не найдены"}, status=status.HTTP_404_NOT_FOUND)
-    
+        query_type = request.query_params.get("type")
+        limit_str = request.query_params.get("limit")
+
+        if not query_type or not limit_str:
+            return Response(
+                {'error': 'Параметры "type" и "limit" обязательны'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            limit_value = int(limit_str)
+        except ValueError:
+            return Response(
+                {'error': 'Параметр "limit" должен быть числом'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if query_type == "user":
+            media_qs = MediaFiles.objects.filter(user=request.user)[:limit_value]
+        elif query_type == "all":
+            media_qs = MediaFiles.objects.all()[:limit_value]
+        else:
+            return Response(
+                {"error": 'Допустимые значения "type": "user" или "all"'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not media_qs.exists():
+            return Response({"error": "Записи не найдены"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = MediaFilesSerializer(media_qs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+# ===================================
+#   NEWS VIEWS
+# ===================================
+
 class PostNewsView(APIView):
+    """
+    Создание новости с загрузкой медиафайлов (video_file).
+    """
     permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
 
     @swagger_auto_schema(
-        operation_description="Создание записи с видео или фото",
+        operation_description="Создание новости с прикрепленными медиафайлами",
         manual_parameters=[
             openapi.Parameter(
-                'title', openapi.IN_FORM, description="Заголовок новости(макс = 512символов)", type=openapi.TYPE_STRING
+                'title',
+                openapi.IN_FORM,
+                description="Заголовок новости (до 512 символов)",
+                type=openapi.TYPE_STRING
             ),
             openapi.Parameter(
-                'text', openapi.IN_FORM, description="Текст новости", type=openapi.TYPE_STRING
+                'text',
+                openapi.IN_FORM,
+                description="Текст новости",
+                type=openapi.TYPE_STRING
             ),
             openapi.Parameter(
-                'media', openapi.IN_FORM, description="Медиа файлы", type=openapi.TYPE_STRING
+                'media',
+                openapi.IN_FORM,
+                description="Медиафайлы (можно несколько)",
+                type=openapi.TYPE_FILE,
+                multiple=True
             ),
         ],
         responses={
-            201: "Запись успешно создана",
+            201: "Новость успешно создана",
             400: "Ошибка в данных"
         }
     )
-
     def post(self, request, *args, **kwargs):
         data = {
             'title': request.data.get('title'),
             'text': request.data.get('text'),
         }
+        serializer = NewsSerializer(data=data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        serializer = NewsSerializer(data = data)
-        if serializer.is_valid():
-            news_instanse = serializer.save()
-            media_files = request.FILES.getlist('media')
-            for media in media_files:
-                MediaFileNews.objects.create(news = news_instanse, video_file = media)
-            return Response(NewsSerializer(news_instanse).data, status = status.HTTP_201_CREATED)
-        return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)
-    
+        news_instance = serializer.save()
+        media_files = request.FILES.getlist('media')
+        for media_item in media_files:
+            MediaFileNews.objects.create(
+                news=news_instance,
+                video_file=media_item
+            )
+        return Response(
+            NewsSerializer(news_instance).data,
+            status=status.HTTP_201_CREATED
+        )
+
+
 class GetNewsView(APIView):
+    """
+    Получение одной новости по её ID.
+    """
     permission_classes = [IsAuthenticated]
+
     @swagger_auto_schema(
-        operation_description="Получение записи по ID",
+        operation_description="Получение новости по ID",
         manual_parameters=[
             openapi.Parameter(
-                'id', openapi.IN_QUERY, description="ID записи", type=openapi.TYPE_INTEGER
+                'id',
+                openapi.IN_QUERY,
+                description="ID новости",
+                type=openapi.TYPE_INTEGER
             ),
         ],
         responses={
             200: NewsSerializer(),
-            404: "Запись не найдена"
+            400: "Не указан параметр id",
+            404: "Новость не найдена"
         }
     )
-
     def get(self, request, *args, **kwargs):
         news_id = request.query_params.get('id')
+        if not news_id:
+            return Response(
+                {"error": "Необходимо указать параметр 'id'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         try:
-            news = News.objects.get(id = news_id)
-            serializer = NewsSerializer(news)
-            return Response(serializer.data, status = status.HTTP_200_OK)
+            news_obj = News.objects.get(id=news_id)
+            serializer = NewsSerializer(news_obj)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         except News.DoesNotExist:
-            return Response({'error': 'Запись не найдена'}, status = status.HTTP_404_NOT_FOUND)
-        
+            return Response({'error': 'Новость не найдена'}, status=status.HTTP_404_NOT_FOUND)
+
+
 class GetNewsListView(APIView):
+    """
+    Получение списка новостей, ограниченного параметром limit.
+    """
     permission_classes = [IsAuthenticated]
+
     @swagger_auto_schema(
-        operation_description="Получение новостей с начала по лимиту",
+        operation_description="Получение списка новостей с ограничением по количеству (limit)",
         manual_parameters=[
             openapi.Parameter(
-                'limit', openapi.IN_QUERY, description="Лимит записей. В query_params", type=openapi.TYPE_INTEGER
+                'limit',
+                openapi.IN_QUERY,
+                description="Сколько новостей нужно получить",
+                type=openapi.TYPE_INTEGER
             ),
         ],
         responses={
-            200: NewsSerializer(many = True),
+            200: NewsSerializer(many=True),
+            400: "Некорректный параметр limit"
         }
     )
-
     def get(self, request, *args, **kwargs):
-        limit = int(request.query_params.get('limit'))
-        news = News.objects.all()[:limit]
-        serializer = NewsSerializer(news, many = True)
-        return Response(serializer.data, status = status.HTTP_200_OK)
+        limit_str = request.query_params.get('limit')
+        if not limit_str:
+            return Response(
+                {"error": "Параметр 'limit' обязателен"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-      
-class CheckToken(APIView):
+        try:
+            limit_value = int(limit_str)
+        except ValueError:
+            return Response(
+                {"error": "Параметр 'limit' должен быть числом"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        news_qs = News.objects.all()[:limit_value]
+        serializer = NewsSerializer(news_qs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+# ===================================
+#   NEW FUNCTIONALITY: UPDATE/DELETE NEWS
+# ===================================
+
+class UpdateNewsView(APIView):
+    """
+    Обновление (PUT) новости по её ID. Допускает частичный апдейт (title/text).
+    """
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
-        operation_description="Проверка авторизации",
+        operation_description="Обновление новости (title, text) по ID",
+        manual_parameters=[
+            openapi.Parameter(
+                'id',
+                openapi.IN_QUERY,
+                description="ID новости",
+                type=openapi.TYPE_INTEGER
+            ),
+            openapi.Parameter(
+                'title',
+                openapi.IN_FORM,
+                description="Новый заголовок (необязательно)",
+                type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                'text',
+                openapi.IN_FORM,
+                description="Новый текст (необязательно)",
+                type=openapi.TYPE_STRING
+            ),
+        ],
+        responses={
+            200: "Новость успешно обновлена",
+            400: "Некорректные данные или не указан id",
+            404: "Новость не найдена"
+        }
+    )
+    def put(self, request, *args, **kwargs):
+        news_id = request.query_params.get('id')
+        if not news_id:
+            return Response(
+                {"error": "Необходимо указать параметр 'id'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            news_obj = News.objects.get(id=news_id)
+        except News.DoesNotExist:
+            return Response(
+                {"error": "Новость не найдена"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Сформируем обновлённые данные (partial update)
+        updated_data = {}
+        if 'title' in request.data:
+            updated_data['title'] = request.data['title']
+        if 'text' in request.data:
+            updated_data['text'] = request.data['text']
+
+        # Если пользователь не передал ничего для обновления
+        if not updated_data:
+            return Response(
+                {"error": "Нет данных для обновления (title, text)"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = NewsSerializer(
+            news_obj,
+            data=updated_data,
+            partial=True
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"message": "Новость успешно обновлена"},
+                status=status.HTTP_200_OK
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DeleteNewsView(APIView):
+    """
+    Удаление новости по её ID.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_description="Удаление новости по ID",
+        manual_parameters=[
+            openapi.Parameter(
+                'id',
+                openapi.IN_QUERY,
+                description="ID новости",
+                type=openapi.TYPE_INTEGER
+            ),
+        ],
+        responses={
+            204: "Новость успешно удалена",
+            400: "Не указан параметр id",
+            404: "Новость не найдена"
+        }
+    )
+    def delete(self, request, *args, **kwargs):
+        news_id = request.query_params.get('id')
+        if not news_id:
+            return Response(
+                {"error": "Необходимо указать параметр 'id'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            news_obj = News.objects.get(id=news_id)
+            news_obj.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except News.DoesNotExist:
+            return Response(
+                {"error": "Новость не найдена"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
+# ===================================
+#   UTILS / MISC
+# ===================================
+
+class CheckToken(APIView):
+    """
+    Проверяет валидность JWT-токена (Simple JWT).
+    """
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_description="Проверка действия JWT-токена",
         responses={
             200: "Авторизация успешна",
             401: "Ошибка авторизации"
         }
     )
     def get(self, request, *args, **kwargs):
-        return Response({"message": "Авторизация успешна"}, status=status.HTTP_200_OK)
-
+        return Response(
+            {"message": "Авторизация успешна"},
+            status=status.HTTP_200_OK
+        )

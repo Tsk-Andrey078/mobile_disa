@@ -128,7 +128,7 @@ logging.basicConfig(level=logging.INFO)
 
 sentry_sdk.init(
     dsn=config("SENTRY_DSN"),
-    debug=True,
+    debug=False,
     integrations=[
         DjangoIntegration(middleware_spans=True, signals_spans=True, ),
     ],
