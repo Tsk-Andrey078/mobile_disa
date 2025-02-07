@@ -1,7 +1,7 @@
 from rest_framework_simplejwt.views import TokenObtainPairView
 from fcm_django.models import FCMDevice
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.views import APIView
 from rest_framework import status
@@ -20,6 +20,139 @@ from .serializer import (
 
 
 # ===================================
+#   RESET / UPDATE PASSWORD VIEWS
+# ===================================
+
+class RequestPasswordResetView(APIView):
+    """
+    Отправка SMS-кода для восстановления пароля.
+    Пользователь указывает свой phone_number,
+    если пользователь с таким номером существует, отправляем код.
+    """
+    permission_classes = [AllowAny]
+
+    @swagger_auto_schema(
+        operation_description="Отправка кода для сброса пароля по номеру телефона",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'phone_number': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Номер телефона, на который отправляем код"
+                ),
+            },
+            required=['phone_number'],
+        ),
+        responses={
+            200: 'Код отправлен успешно',
+            400: 'Номер телефона не указан',
+            404: 'Пользователь с таким номером не найден',
+            500: 'Ошибка при отправке кода'
+        }
+    )
+    def post(self, request):
+        phone_number = request.data.get('phone_number')
+        if not phone_number:
+            return Response(
+                {"error": "Номер телефона обязателен."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not CustomUser.objects.filter(phone_number=phone_number).exists():
+            return Response(
+                {"error": "Пользователь с таким номером не найден."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        result = send_verification_code(phone_number)
+        if 'status' in result:
+            return Response(
+                {"message": "Код для сброса пароля успешно отправлен."},
+                status=status.HTTP_200_OK
+            )
+        return Response(
+            {
+                "error": result.get("error", "Неизвестная ошибка"),
+                "message": result.get("message", "Ошибка при отправке кода"),
+                "error_code": result.get("error_code", "Неизвестный код ошибки")
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+class ConfirmPasswordResetView(APIView):
+    """
+    Подтверждение кода из SMS и установка нового пароля.
+    """
+    permission_classes = [AllowAny]
+
+    @swagger_auto_schema(
+        operation_description="Подтверждение кода и сброс пароля",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'phone_number': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Номер телефона"
+                ),
+                'code': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Код подтверждения из SMS"
+                ),
+                'new_password': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Новый пароль"
+                ),
+            },
+            required=['phone_number', 'code', 'new_password'],
+        ),
+        responses={
+            200: 'Пароль успешно обновлён',
+            400: 'Код неверен или не указаны обязательные поля',
+            404: 'Пользователь с таким номером не найден',
+            500: 'Ошибка при обновлении пароля'
+        }
+    )
+    def post(self, request):
+        phone_number = request.data.get('phone_number')
+        code = request.data.get('code')
+        new_password = request.data.get('new_password')
+
+        if not phone_number or not code or not new_password:
+            return Response(
+                {"error": "Необходимо указать phone_number, code и new_password"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = CustomUser.objects.filter(phone_number=phone_number).first()
+        if not user:
+            return Response(
+                {"error": "Пользователь с таким номером не найден."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if not check_verification_code(phone_number, code):
+            return Response(
+                {"error": "Неверный код подтверждения."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            user.password = make_password(new_password)
+            user.save()
+            return Response(
+                {"message": "Пароль успешно обновлён."},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            capture_exception(e)
+            return Response(
+                {"error": f"Ошибка при обновлении пароля: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+# ===================================
 #   AUTH / REGISTRATION VIEWS
 # ===================================
 
@@ -27,6 +160,7 @@ class SendVerificationCodeView(APIView):
     """
     Отправляет код подтверждения на указанный номер телефона.
     """
+
     @swagger_auto_schema(
         operation_description="Отправка кода подтверждения на номер телефона",
         request_body=openapi.Schema(
@@ -74,6 +208,7 @@ class VerifyCodeAndRegisterView(APIView):
     """
     Проверяет код подтверждения и регистрирует нового пользователя.
     """
+
     @swagger_auto_schema(
         operation_description="Проверка кода и регистрация нового пользователя",
         request_body=openapi.Schema(
@@ -158,6 +293,7 @@ class RegisterDeviceView(APIView):
     """
     Регистрация устройства для получения push-уведомлений.
     """
+
     @swagger_auto_schema(
         operation_description="Регистрация устройства (FCM) для уведомлений",
         request_body=openapi.Schema(
