@@ -1,12 +1,15 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import MediaFiles, MediaFile, MediaFileNews, News, CustomUser
+
 
 class MediaFileNewsSerializer(serializers.ModelSerializer):
     class Meta:
         model = MediaFileNews
         fields = ['id', 'video_file']
+
 
 class NewsSerializer(serializers.ModelSerializer):
     media = serializers.SerializerMethodField()
@@ -16,13 +19,15 @@ class NewsSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'text', 'created_at', 'media']
 
     def get_media(self, obj):
-        media_files = MediaFileNews.objects.filter(news = obj)
-        return MediaFileNewsSerializer(media_files, many = True).data
+        media_files = MediaFileNews.objects.filter(news=obj)
+        return MediaFileNewsSerializer(media_files, many=True).data
+
 
 class MediaFileSerializer(serializers.ModelSerializer):
     class Meta:
         model = MediaFile
         fields = ['id', 'video_file']
+
 
 class MediaFilesSerializer(serializers.ModelSerializer):
     videos = serializers.SerializerMethodField()
@@ -35,7 +40,8 @@ class MediaFilesSerializer(serializers.ModelSerializer):
         # Возвращаем сериализованные видеофайлы, связанные с текущей записью
         media_files = MediaFile.objects.filter(media=obj)
         return MediaFileSerializer(media_files, many=True).data
-        
+
+
 class UserRegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
@@ -49,7 +55,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             password=validated_data['password']
         )
         return user
-    
+
+
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     phone_number = serializers.CharField()
 
@@ -61,7 +68,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         user = authenticate(username=phone_number, password=password)
 
         if not user:
-            raise serializers.ValidationError("Invalid credentials")
+            raise AuthenticationFailed("Invalid credentials")
 
         # Получаем токен и добавляем данные
         token = self.get_token(user)
