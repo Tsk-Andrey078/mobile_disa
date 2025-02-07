@@ -675,6 +675,7 @@ class UpdateNewsView(APIView):
     Обновление (PUT) новости по её ID. Допускает частичный апдейт (title/text).
     """
     permission_classes = [IsAuthenticated]
+    parser_classes = [FormParser, MultiPartParser]
 
     @swagger_auto_schema(
         operation_description="Обновление новости (title, text) по ID",
