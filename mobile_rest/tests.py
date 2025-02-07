@@ -3,6 +3,9 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from .models import News, MediaFiles
+from unittest.mock import patch
+
+User = get_user_model()
 
 
 class BaseAPITest(APITestCase):
@@ -363,3 +366,96 @@ class CheckTokenTest(BaseAPITest):
         response = self.client.get(self.url, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['message'], 'Авторизация успешна')
+
+
+class RequestPasswordResetViewTest(APITestCase):
+    def setUp(self):
+        self.url = reverse('request_password_reset')
+        self.existing_user = User.objects.create_user(
+            phone_number='79990001122',
+            password='old_password'
+        )
+
+    @patch('mobile_rest.views.send_verification_code', return_value={'status': 'pending'})
+    def test_request_reset_success(self, mock_send):
+        data = {"phone_number": self.existing_user.phone_number}
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        mock_send.assert_called_once_with(self.existing_user.phone_number)
+
+    def test_request_reset_no_phone(self):
+        response = self.client.post(self.url, {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('error', response.data)
+
+    def test_request_reset_user_not_found(self):
+        data = {"phone_number": "70000000000"}  # несуществующий
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn('error', response.data)
+
+    @patch('mobile_rest.views.send_verification_code', return_value={
+        'error': 'Ошибка при отправке кода',
+        'message': 'Что-то пошло не так',
+        'error_code': '12345'
+    })
+    def test_request_reset_twilio_error(self, mock_send):
+        data = {"phone_number": self.existing_user.phone_number}
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertIn('error', response.data)
+        self.assertIn('error_code', response.data)
+        mock_send.assert_called_once()
+
+
+class ConfirmPasswordResetViewTest(APITestCase):
+    def setUp(self):
+        self.url = reverse('confirm_password_reset')
+        self.existing_user = User.objects.create_user(
+            phone_number='79990001122',
+            password='old_password'
+        )
+
+    @patch('mobile_rest.views.check_verification_code', return_value=True)
+    def test_confirm_reset_success(self, mock_check):
+        data = {
+            "phone_number": self.existing_user.phone_number,
+            "code": "123456",
+            "new_password": "new_secure_password"
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.existing_user.refresh_from_db()
+        self.assertTrue(self.existing_user.check_password("new_secure_password"))
+
+        mock_check.assert_called_once_with(self.existing_user.phone_number, "123456")
+
+    def test_confirm_reset_no_fields(self):
+        response = self.client.post(self.url, {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('error', response.data)
+
+    def test_confirm_reset_user_not_found(self):
+        data = {
+            "phone_number": "70000000000",
+            "code": "123456",
+            "new_password": "some_new_pass"
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn('error', response.data)
+
+    @patch('mobile_rest.views.check_verification_code', return_value=False)
+    def test_confirm_reset_wrong_code(self, mock_check):
+        data = {
+            "phone_number": self.existing_user.phone_number,
+            "code": "wrong_code",
+            "new_password": "new_secure_password"
+        }
+        response = self.client.post(self.url, data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('error', response.data)
+        mock_check.assert_called_once_with(self.existing_user.phone_number, "wrong_code")

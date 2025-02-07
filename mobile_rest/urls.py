@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import UpdateNewsView, DeleteNewsView, SendVerificationCodeView, VerifyCodeAndRegisterView, CustomTokenObtainPairView, RegisterDeviceView, MediaFilesUploadView, MediaFilesListView, MediaFilesDetailView, GetNewsListView, GetNewsView, PostNewsView, CheckToken
+from .views import RequestPasswordResetView, ConfirmPasswordResetView, UpdateNewsView, DeleteNewsView, SendVerificationCodeView, VerifyCodeAndRegisterView, CustomTokenObtainPairView, RegisterDeviceView, MediaFilesUploadView, MediaFilesListView, MediaFilesDetailView, GetNewsListView, GetNewsView, PostNewsView, CheckToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
@@ -41,6 +41,9 @@ urlpatterns = [
 
     path('news/update/', UpdateNewsView.as_view(), name='news-update'),
     path('news/delete/', DeleteNewsView.as_view(), name='news-delete'),
+
+    path('auth/request_password_reset/', RequestPasswordResetView.as_view(), name='request_password_reset'),
+    path('auth/confirm_password_reset/', ConfirmPasswordResetView.as_view(), name='confirm_password_reset'),
 
     path('check-token', CheckToken.as_view(), name='check-token'),
 ]
