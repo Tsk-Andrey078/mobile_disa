@@ -183,6 +183,7 @@ class MediaFilesUploadView(APIView):
             'description': request.data.get('description'),
             'was_at_date': request.data.get('was_at_date'),
             'was_at_time': request.data.get('was_at_time'),
+            'status': 'Waiting',
         }
         serializer = MediaFilesSerializer(data = data)
         if serializer.is_valid():
