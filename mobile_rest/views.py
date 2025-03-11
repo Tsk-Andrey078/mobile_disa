@@ -659,7 +659,7 @@ class UpdateNewsView(APIView):
             'text': openapi.Schema(type=openapi.TYPE_STRING, description="Текст"),
             'id': openapi.Schema(type=openapi.TYPE_INTEGER, description="None"),
         },
-        required=['title', 'text', 'media']
+        required=['title', 'text', 'id']
         ),
         responses={
             200: "Новость успешно обновлена",
