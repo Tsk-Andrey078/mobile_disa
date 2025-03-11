@@ -1,6 +1,6 @@
 from django.urls import path
-from .views import RequestPasswordResetView, ConfirmPasswordResetView, UpdateNewsView, DeleteNewsView, SendVerificationCodeView, VerifyCodeAndRegisterView, CustomTokenObtainPairView, RegisterDeviceView, MediaFilesUploadView, MediaFilesListView, MediaFilesDetailView, GetNewsListView, GetNewsView, PostNewsView, CheckToken
-from rest_framework_simplejwt.views import TokenRefreshView
+from .views import SendVerificationCodeView, VerifyCodeAndRegisterView, CustomTokenObtainPairView, RegisterDeviceView, MediaFileUploadView, MediaFilesListView, MediaFilesDetailView, GetNewsListView, GetNewsView, PostNewsView, CheckToken, MediaFilesCreateView
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
@@ -32,7 +32,8 @@ urlpatterns = [
     path('login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('register-device/', RegisterDeviceView.as_view(), name='register_device'),
-    path('mediafiles/upload/', MediaFilesUploadView.as_view(), name='mediafiles-upload'),
+    path('mediafiles/upload/', MediaFilesCreateView.as_view(), name='mediafiles-create'),
+    path('mediafiles/upload-media/', MediaFileUploadView.as_view(), name='mediafiles-upload-media'),
     path('mediafiles/detail/', MediaFilesDetailView.as_view(), name='mediafiles-detail'),
     path('mediafiles/list/', MediaFilesListView.as_view(), name='mediafiles-list'),
     path('news/upload/', PostNewsView.as_view(), name='news-upload'),

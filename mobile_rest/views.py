@@ -340,63 +340,21 @@ class RegisterDeviceView(APIView):
             status=status.HTTP_200_OK
         )
 
+class MediaFilesCreateView(APIView):
 
-# ===================================
-#   MEDIA FILES VIEWS
-# ===================================
-
-class MediaFilesUploadView(APIView):
-    """
-    Загрузка медиафайлов (фото/видео).
-    """
     permission_classes = [IsAuthenticated]
-    parser_classes = (MultiPartParser, FormParser)
 
     @swagger_auto_schema(
-        operation_description="Создание записи с видео или фото",
+        operation_description="Создание записи без видео",
         manual_parameters=[
-            openapi.Parameter(
-                'city',
-                openapi.IN_FORM,
-                description="Город происшествия",
-                type=openapi.TYPE_STRING
-            ),
-            openapi.Parameter(
-                'street',
-                openapi.IN_FORM,
-                description="Улица происшествия",
-                type=openapi.TYPE_STRING
-            ),
-            openapi.Parameter(
-                'description',
-                openapi.IN_FORM,
-                description="Описание происшествия",
-                type=openapi.TYPE_STRING
-            ),
-            openapi.Parameter(
-                'was_at_date',
-                openapi.IN_FORM,
-                description="Дата (YYYY-MM-DD)",
-                type=openapi.TYPE_STRING
-            ),
-            openapi.Parameter(
-                'was_at_time',
-                openapi.IN_FORM,
-                description="Время (HH:MM:SS)",
-                type=openapi.TYPE_STRING
-            ),
-            openapi.Parameter(
-                'videos',
-                openapi.IN_FORM,
-                description="Видео файлы (можно несколько)",
-                type=openapi.TYPE_FILE,
-                multiple=True
-            ),
+
+            openapi.Parameter('city', openapi.IN_FORM, description="Город", type=openapi.TYPE_STRING),
+            openapi.Parameter('street', openapi.IN_FORM, description="Улица", type=openapi.TYPE_STRING),
+            openapi.Parameter('description', openapi.IN_FORM, description="Описание", type=openapi.TYPE_STRING),
+            openapi.Parameter('was_at_date', openapi.IN_FORM, description="Дата происшествия (YYYY-MM-DD)", type=openapi.TYPE_STRING),
+            openapi.Parameter('was_at_time', openapi.IN_FORM, description="Время происшествия (HH:MM:SS)", type=openapi.TYPE_STRING),
         ],
-        responses={
-            201: "Запись успешно создана",
-            400: "Ошибка валидации данных"
-        }
+        responses={201: "Запись создана", 400: "Ошибка в данных"}
     )
     def post(self, request, *args, **kwargs):
         data = {
@@ -409,21 +367,43 @@ class MediaFilesUploadView(APIView):
             'status': 'Waiting',
         }
         serializer = MediaFilesSerializer(data=data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        media_instance = serializer.save()
-        video_files = request.FILES.getlist('videos')
+        if serializer.is_valid():
+            media_instance = serializer.save()
+            return Response(MediaFilesSerializer(media_instance).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class MediaFileUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
 
-        for video in video_files:
-            MediaFile.objects.create(
-                media=media_instance,
-                video_file=video
-            )
-        return Response(
-            MediaFilesSerializer(media_instance).data,
-            status=status.HTTP_201_CREATED
-        )
+    @swagger_auto_schema(
+        operation_description="Загрузка или замена видео для записи",
+        manual_parameters=[
+            openapi.Parameter('media_id', openapi.IN_FORM, description="ID записи", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('video', openapi.IN_FORM, description="Видео файл", type=openapi.TYPE_FILE),
+        ],
+        responses={201: "Видео загружено", 400: "Ошибка"}
+    )
+    def post(self, request, *args, **kwargs):
+        media_id = request.data.get('media_id')
+        video_file = request.FILES.get('video')
+
+        if not media_id or not video_file:
+            return Response({'error': 'media_id и video обязательны'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            media_instance = MediaFiles.objects.get(id=media_id)
+        except MediaFiles.DoesNotExist:
+            return Response({'error': 'MediaFiles не найден'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Удаляем старое видео (если есть)
+        MediaFile.objects.filter(media=media_instance).delete()
+
+        # Создаем новую запись
+        MediaFile.objects.create(media=media_instance, video_file=video_file)
+
+        return Response({'message': 'Видео загружено'}, status=status.HTTP_201_CREATED)
 
 
 class MediaFilesDetailView(APIView):
