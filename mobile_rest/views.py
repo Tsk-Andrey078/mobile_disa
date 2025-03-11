@@ -346,14 +346,17 @@ class MediaFilesCreateView(APIView):
 
     @swagger_auto_schema(
         operation_description="Создание записи без видео",
-        manual_parameters=[
-
-            openapi.Parameter('city', openapi.IN_FORM, description="Город", type=openapi.TYPE_STRING),
-            openapi.Parameter('street', openapi.IN_FORM, description="Улица", type=openapi.TYPE_STRING),
-            openapi.Parameter('description', openapi.IN_FORM, description="Описание", type=openapi.TYPE_STRING),
-            openapi.Parameter('was_at_date', openapi.IN_FORM, description="Дата происшествия (YYYY-MM-DD)", type=openapi.TYPE_STRING),
-            openapi.Parameter('was_at_time', openapi.IN_FORM, description="Время происшествия (HH:MM:SS)", type=openapi.TYPE_STRING),
-        ],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'city': openapi.Schema(type=openapi.TYPE_STRING, description="Город"),
+                'street': openapi.Schema(type=openapi.TYPE_STRING, description="Улица"),
+                'description': openapi.Schema(type=openapi.TYPE_STRING, description="Описание"),
+                'was_at_date': openapi.Schema(type=openapi.TYPE_STRING, description="Дата (YYYY-MM-DD)"),
+                'was_at_time': openapi.Schema(type=openapi.TYPE_STRING, description="Время (HH:MM:SS)"),
+            },
+            required=['city', 'street', 'description', 'was_at_date', 'was_at_time']
+        ),
         responses={201: "Запись создана", 400: "Ошибка в данных"}
     )
     def post(self, request, *args, **kwargs):
@@ -379,10 +382,14 @@ class MediaFileUploadView(APIView):
 
     @swagger_auto_schema(
         operation_description="Загрузка или замена видео для записи",
-        manual_parameters=[
-            openapi.Parameter('media_id', openapi.IN_FORM, description="ID записи", type=openapi.TYPE_INTEGER),
-            openapi.Parameter('video', openapi.IN_FORM, description="Видео файл", type=openapi.TYPE_FILE),
-        ],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'media_id': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID записи"),
+                'video': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_BINARY, description="Видео файл"),
+            },
+            required=['media_id', 'video']
+        ),
         responses={201: "Видео загружено", 400: "Ошибка"}
     )
     def post(self, request, *args, **kwargs):
@@ -517,27 +524,15 @@ class PostNewsView(APIView):
 
     @swagger_auto_schema(
         operation_description="Создание новости с прикрепленными медиафайлами",
-        manual_parameters=[
-            openapi.Parameter(
-                'title',
-                openapi.IN_FORM,
-                description="Заголовок новости (до 512 символов)",
-                type=openapi.TYPE_STRING
-            ),
-            openapi.Parameter(
-                'text',
-                openapi.IN_FORM,
-                description="Текст новости",
-                type=openapi.TYPE_STRING
-            ),
-            openapi.Parameter(
-                'media',
-                openapi.IN_FORM,
-                description="Медиафайлы (можно несколько)",
-                type=openapi.TYPE_FILE,
-                multiple=True
-            ),
-        ],
+        request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            'title': openapi.Schema(type=openapi.TYPE_STRING, description="Заголовок записи"),
+            'text': openapi.Schema(type=openapi.TYPE_STRING, description="Текст"),
+            'media': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_BINARY, description="Видео файл"),
+        },
+        required=['title', 'text', 'media']
+        ),
         responses={
             201: "Новость успешно создана",
             400: "Ошибка в данных"
@@ -657,26 +652,15 @@ class UpdateNewsView(APIView):
 
     @swagger_auto_schema(
         operation_description="Обновление новости (title, text) по ID",
-        manual_parameters=[
-            openapi.Parameter(
-                'id',
-                openapi.IN_QUERY,
-                description="ID новости",
-                type=openapi.TYPE_INTEGER
-            ),
-            openapi.Parameter(
-                'title',
-                openapi.IN_FORM,
-                description="Новый заголовок (необязательно)",
-                type=openapi.TYPE_STRING
-            ),
-            openapi.Parameter(
-                'text',
-                openapi.IN_FORM,
-                description="Новый текст (необязательно)",
-                type=openapi.TYPE_STRING
-            ),
-        ],
+        request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            'title': openapi.Schema(type=openapi.TYPE_STRING, description="Заголовок записи"),
+            'text': openapi.Schema(type=openapi.TYPE_STRING, description="Текст"),
+            'id': openapi.Schema(type=openapi.TYPE_INTEGER, description="None"),
+        },
+        required=['title', 'text', 'media']
+        ),
         responses={
             200: "Новость успешно обновлена",
             400: "Некорректные данные или не указан id",
