@@ -39,5 +39,12 @@ urlpatterns = [
     path('news/upload/', PostNewsView.as_view(), name='news-upload'),
     path('news/detail/', GetNewsView.as_view(), name='news-detail'),
     path('news/list/', GetNewsListView.as_view(), name='news-list'),
-    path('check-token', CheckToken.as_view(), name='check-token')
+
+    path('news/update/', UpdateNewsView.as_view(), name='news-update'),
+    path('news/delete/', DeleteNewsView.as_view(), name='news-delete'),
+
+    path('auth/request_password_reset/', RequestPasswordResetView.as_view(), name='request_password_reset'),
+    path('auth/confirm_password_reset/', ConfirmPasswordResetView.as_view(), name='confirm_password_reset'),
+
+    path('check-token', CheckToken.as_view(), name='check-token'),
 ]
