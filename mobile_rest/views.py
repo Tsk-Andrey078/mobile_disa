@@ -380,18 +380,6 @@ class MediaFileUploadView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
 
-    @swagger_auto_schema(
-        operation_description="Загрузка или замена видео для записи",
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'media_id': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID записи"),
-                'video': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_BINARY, description="Видео файл"),
-            },
-            required=['media_id', 'video']
-        ),
-        responses={201: "Видео загружено", 400: "Ошибка"}
-    )
     def post(self, request, *args, **kwargs):
         media_id = request.data.get('media_id')
         video_file = request.FILES.get('video')
@@ -522,22 +510,6 @@ class PostNewsView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
 
-    @swagger_auto_schema(
-        operation_description="Создание новости с прикрепленными медиафайлами",
-        request_body=openapi.Schema(
-        type=openapi.TYPE_OBJECT,
-        properties={
-            'title': openapi.Schema(type=openapi.TYPE_STRING, description="Заголовок записи"),
-            'text': openapi.Schema(type=openapi.TYPE_STRING, description="Текст"),
-            'media': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_BINARY, description="Видео файл"),
-        },
-        required=['title', 'text', 'media']
-        ),
-        responses={
-            201: "Новость успешно создана",
-            400: "Ошибка в данных"
-        }
-    )
     def post(self, request, *args, **kwargs):
         data = {
             'title': request.data.get('title'),
@@ -650,23 +622,6 @@ class UpdateNewsView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [FormParser, MultiPartParser]
 
-    @swagger_auto_schema(
-        operation_description="Обновление новости (title, text) по ID",
-        request_body=openapi.Schema(
-        type=openapi.TYPE_OBJECT,
-        properties={
-            'title': openapi.Schema(type=openapi.TYPE_STRING, description="Заголовок записи"),
-            'text': openapi.Schema(type=openapi.TYPE_STRING, description="Текст"),
-            'id': openapi.Schema(type=openapi.TYPE_INTEGER, description="None"),
-        },
-        required=['title', 'text', 'id']
-        ),
-        responses={
-            200: "Новость успешно обновлена",
-            400: "Некорректные данные или не указан id",
-            404: "Новость не найдена"
-        }
-    )
     def put(self, request, *args, **kwargs):
         news_id = request.query_params.get('id')
         if not news_id:
@@ -717,22 +672,6 @@ class DeleteNewsView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @swagger_auto_schema(
-        operation_description="Удаление новости по ID",
-        manual_parameters=[
-            openapi.Parameter(
-                'id',
-                openapi.IN_QUERY,
-                description="ID новости",
-                type=openapi.TYPE_INTEGER
-            ),
-        ],
-        responses={
-            204: "Новость успешно удалена",
-            400: "Не указан параметр id",
-            404: "Новость не найдена"
-        }
-    )
     def delete(self, request, *args, **kwargs):
         news_id = request.query_params.get('id')
         if not news_id:
@@ -762,13 +701,6 @@ class CheckToken(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    @swagger_auto_schema(
-        operation_description="Проверка действия JWT-токена",
-        responses={
-            200: "Авторизация успешна",
-            401: "Ошибка авторизации"
-        }
-    )
     def get(self, request, *args, **kwargs):
         return Response(
             {"message": "Авторизация успешна"},
