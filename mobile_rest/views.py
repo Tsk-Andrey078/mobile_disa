@@ -397,9 +397,6 @@ class MediaFileUploadView(APIView):
         except MediaFiles.DoesNotExist:
             return Response({'error': 'MediaFiles не найден'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Удаляем старое видео (если есть)
-        MediaFile.objects.filter(media=media_instance).delete()
-
         # Создаем новую запись
         MediaFile.objects.create(media=media_instance, video_file=video_file)
 
