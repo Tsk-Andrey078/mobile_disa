@@ -388,7 +388,7 @@ class MediaFileUploadView(APIView):
             return Response({'error': 'media_id и video обязательны'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            media_instance = MediaFiles.objects.get(id=media_id)
+            media_instance = MediaFiles.objects.get(id=int(media_id))
         except MediaFiles.DoesNotExist:
             return Response({'error': 'MediaFiles не найден'}, status=status.HTTP_404_NOT_FOUND)
 
