@@ -36,6 +36,9 @@ INSTALLED_APPS = [
     "fcm_django",
 ]
 
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880000  # 500MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880000  # 500MB
+
 FCM_DJANGO_SETTINGS = {
     "FCM_SERVER_KEY": "YOUR_SERVER_KEY",  # Секретный ключ FCM из Firebase
     "ONE_DEVICE_PER_USER": False,  # Разрешить несколько устройств на пользователя
