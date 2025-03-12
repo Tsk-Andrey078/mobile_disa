@@ -386,7 +386,7 @@ class MediaFileUploadView(APIView):
     def post(self, request, *args, **kwargs):
         media_id = request.data.get('media_id')
         video_file = request.FILES.get('video')
-
+        print("START OF VIEW")
         if not media_id or not video_file:
             return Response({'error': 'media_id и video обязательны'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -407,7 +407,7 @@ class MediaFileUploadView(APIView):
         try:
             # 1. Инициализация Multipart Upload
             multipart_upload = s3_client.create_multipart_upload(Bucket=config("CLOUDFLARE_R2_BUCKET"), Key=s3_key)
-
+            print("START OF MU")
             parts = []
             part_number = 1
 
@@ -431,6 +431,7 @@ class MediaFileUploadView(APIView):
                 UploadId=multipart_upload['UploadId'],
                 MultipartUpload={'Parts': parts}
             )
+            print("FINISH OF UPLOAD")
 
             file_url = f"https://{config('CLOUDFLARE_R2_BUCKET')}.object.pscloud.io/{s3_key}"
 
