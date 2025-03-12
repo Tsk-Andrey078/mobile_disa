@@ -17,6 +17,6 @@ COPY . /app
 RUN python manage.py collectstatic --noinput
 
 EXPOSE 8000
-
+RUN python manage.py makemigrations
 #CMD ["gunicorn", "--bind", "0.0.0.0:8000", "mobile_prj.wsgi:application"]
 CMD ["python3", "manage.py", "runserver", "0.0.0.0:8000"]
