@@ -402,7 +402,7 @@ class MediaFileUploadView(APIView):
             endpoint_url=config("CLOUDFLARE_R2_BUCKET_ENDPOINT")
         )
 
-        s3_key = f"mobile-disa/media/video/{uuid.uuid4()}_{video_file.name}"
+        s3_key = f"media/video/{uuid.uuid4()}_{video_file.name}"
 
         try:
             # 1. Инициализация Multipart Upload
