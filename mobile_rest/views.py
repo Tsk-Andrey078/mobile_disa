@@ -9,7 +9,10 @@ from drf_yasg.utils import swagger_auto_schema
 from django.contrib.auth.hashers import make_password
 from sentry_sdk import capture_exception
 from drf_yasg import openapi
-
+from decouple import config
+import boto3
+import uuid
+from botocore.exceptions import BotoCoreError, ClientError
 from .twilio_service import send_verification_code, check_verification_code
 from .models import CustomUser, MediaFiles, MediaFile, MediaFileNews, News
 from .serializer import (
@@ -392,10 +395,52 @@ class MediaFileUploadView(APIView):
         except MediaFiles.DoesNotExist:
             return Response({'error': 'MediaFiles не найден'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Создаем новую запись
-        MediaFile.objects.create(media=media_instance, video_file=video_file)
+        s3_client = boto3.client(
+            "s3",
+            aws_access_key_id=config("CLOUDFLARE_R2_ACCESS_KEY"),
+            aws_secret_access_key=config("CLOUDFLARE_R2_SECRET_KEY"),
+            endpoint_url=config("CLOUDFLARE_R2_BUCKET_ENDPOINT")
+        )
 
-        return Response({'message': 'Видео загружено'}, status=status.HTTP_201_CREATED)
+        s3_key = f"mobile-disa/media/video/{uuid.uuid4()}_{video_file.name}"
+
+        try:
+            # 1. Инициализация Multipart Upload
+            multipart_upload = s3_client.create_multipart_upload(Bucket=config("CLOUDFLARE_R2_BUCKET"), Key=s3_key)
+
+            parts = []
+            part_number = 1
+
+            # 2. Читаем и загружаем чанки размером 10MB
+            chunk_size = 10 * 1024 * 1024  # 10 MB
+            for chunk in iter(lambda: video_file.read(chunk_size), b""):
+                part = s3_client.upload_part(
+                    Bucket=config("CLOUDFLARE_R2_BUCKET"),
+                    Key=s3_key,
+                    PartNumber=part_number,
+                    UploadId=multipart_upload['UploadId'],
+                    Body=chunk
+                )
+                parts.append({'PartNumber': part_number, 'ETag': part['ETag']})
+                part_number += 1
+
+            # 3. Завершаем загрузку
+            s3_client.complete_multipart_upload(
+                Bucket=config("CLOUDFLARE_R2_BUCKET"),
+                Key=s3_key,
+                UploadId=multipart_upload['UploadId'],
+                MultipartUpload={'Parts': parts}
+            )
+
+            file_url = f"https://{config('CLOUDFLARE_R2_BUCKET')}.object.pscloud.io/{s3_key}"
+
+            # 4. Сохраняем путь в базе
+            media_file = MediaFile.objects.create(media=media_instance, video_file=file_url)
+
+            return Response({'message': 'Видео загружено', 'file_url': file_url}, status=status.HTTP_201_CREATED)
+
+        except (BotoCoreError, ClientError) as e:
+            return Response({'error': f'Ошибка при загрузке в S3: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class MediaFilesDetailView(APIView):
@@ -706,3 +751,5 @@ class CheckToken(APIView):
             {"message": "Авторизация успешна"},
             status=status.HTTP_200_OK
         )
+
+
