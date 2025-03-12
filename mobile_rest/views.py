@@ -433,7 +433,7 @@ class MediaFileUploadView(APIView):
             )
             print("FINISH OF UPLOAD")
 
-            file_url = f"https://{config('CLOUDFLARE_R2_BUCKET')}.object.pscloud.io/{s3_key}"
+            file_url = f"https://video-oko-1.object.pscloud.io/{s3_key}"
 
             # 4. Сохраняем путь в базе
             media_file = MediaFile.objects.create(media=media_instance, video_file=file_url)
