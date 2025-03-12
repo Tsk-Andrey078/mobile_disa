@@ -40,7 +40,8 @@ class MediaFileSerializer(serializers.ModelSerializer):
             return None
 
         # Получаем s3_key, удаляя base_url из video_file
-        s3_key = obj.video_file[len(base_url):]
+        s3_key = obj.video_file[len(base_url):].strip().lstrip("/")
+        s3_key = s3_key.replace("mobile-disa/mobile-disa/", "mobile-disa/", 1)
 
         s3_client = boto3.client(
             "s3",
