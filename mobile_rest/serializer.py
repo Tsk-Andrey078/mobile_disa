@@ -3,7 +3,8 @@ from django.contrib.auth import authenticate
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import MediaFiles, MediaFile, MediaFileNews, News, CustomUser
-
+import boto3
+from decouple import config
 
 class MediaFileNewsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -24,9 +25,37 @@ class NewsSerializer(serializers.ModelSerializer):
 
 
 class MediaFileSerializer(serializers.ModelSerializer):
+    video_file = serializers.SerializerMethodField()
+
     class Meta:
         model = MediaFile
         fields = ['id', 'video_file']
+
+    def get_video_file(self, obj):
+        if not obj.video_file:
+            return None
+
+        base_url = "https://video-oko-1.object.pscloud.io/"
+        if not obj.video_file.startswith(base_url):
+            return None
+
+        # Получаем s3_key, удаляя base_url из video_file
+        s3_key = obj.video_file[len(base_url):]
+
+        s3_client = boto3.client(
+            "s3",
+            aws_access_key_id=config("CLOUDFLARE_R2_ACCESS_KEY"),
+            aws_secret_access_key=config("CLOUDFLARE_R2_SECRET_KEY"),
+            endpoint_url=config("CLOUDFLARE_R2_BUCKET_ENDPOINT")
+        )
+
+        signed_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': config("CLOUDFLARE_R2_BUCKET"), 'Key': s3_key},
+            ExpiresIn=3600  # Ссылка будет действительна 1 час
+        )
+
+        return signed_url
 
 
 class MediaFilesSerializer(serializers.ModelSerializer):
