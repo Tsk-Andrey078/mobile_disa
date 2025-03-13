@@ -13,7 +13,7 @@ importlib-resources==6.4.0
 jaraco.text==3.12.1
 pip-chill==1.0.3
 platformdirs==4.2.2
-psycopg2==2.9.9
+psycopg2-binary
 python-decouple==3.8
 raven==6.10.0
 sentry-sdk==2.19.2
