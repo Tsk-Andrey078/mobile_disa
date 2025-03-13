@@ -9,7 +9,9 @@ from drf_yasg.utils import swagger_auto_schema
 from django.contrib.auth.hashers import make_password
 from sentry_sdk import capture_exception
 from drf_yasg import openapi
-
+import uuid
+import boto3
+from decouple import config
 from .twilio_service import send_verification_code, check_verification_code
 from .models import CustomUser, MediaFiles, MediaFile, MediaFileNews, News
 from .serializer import (
@@ -378,7 +380,6 @@ class MediaFilesCreateView(APIView):
     
 class MediaFileUploadView(APIView):
     permission_classes = [IsAuthenticated]
-    parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request, *args, **kwargs):
         media_id = request.data.get('media_id')
@@ -392,10 +393,37 @@ class MediaFileUploadView(APIView):
         except MediaFiles.DoesNotExist:
             return Response({'error': 'MediaFiles не найден'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Создаем новую запись
-        MediaFile.objects.create(media=media_instance, video_file=video_file)
+        # Генерируем уникальное имя файла
+        s3_key = f"video/{uuid.uuid4()}_{video_file.name}"
 
-        return Response({'message': 'Видео загружено'}, status=status.HTTP_201_CREATED)
+        # Инициализируем S3 клиент
+        s3_client = boto3.client(
+            "s3",
+            aws_access_key_id=config("CLOUDFLARE_R2_ACCESS_KEY"),
+            aws_secret_access_key=config("CLOUDFLARE_R2_SECRET_KEY"),
+            endpoint_url=config("CLOUDFLARE_R2_BUCKET_ENDPOINT")
+        )
+
+        try:
+            # **ЗАГРУЖАЕМ ПОТОКОМ** в S3
+            s3_client.upload_fileobj(
+                Fileobj=video_file.file,  # Django уже предоставляет file-объект
+                Bucket=config("CLOUDFLARE_R2_BUCKET"),
+                Key="media/"+s3_key,
+                ExtraArgs={'ContentType': 'video/mp4'}
+            )
+
+            file_url = f"{s3_key}"
+
+            # Сохраняем путь в базе
+            media_file = MediaFile.objects.create(media=media_instance)
+            media_file.video_file.name = s3_key
+            media_file.save()
+
+            return Response({'message': 'Файл загружен', 'file_url': file_url}, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({'error': f'Ошибка загрузки в S3: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class MediaFilesDetailView(APIView):

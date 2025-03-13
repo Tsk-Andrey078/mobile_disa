@@ -57,7 +57,7 @@ class CustomUser(AbstractUser):
 class MediaFile(models.Model):
     id = models.AutoField(primary_key = True)
     media = models.ForeignKey('MediaFiles', on_delete = models.CASCADE, related_name = 'videos')
-    video_file = models.FileField(upload_to ='video/')
+    video_file = models.FileField(upload_to='video/', blank=True, default=None, null=True)
 
 class MediaFiles(models.Model):
     id = models.AutoField(primary_key = True)
