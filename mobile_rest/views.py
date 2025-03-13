@@ -384,6 +384,7 @@ class MediaFileUploadView(APIView):
     def post(self, request, *args, **kwargs):
         media_id = request.data.get('media_id')
         video_file = request.FILES.get('video')
+        content_type = request.data.get('content-type')
 
         if not media_id or not video_file:
             return Response({'error': 'media_id и video обязательны'}, status=status.HTTP_400_BAD_REQUEST)
@@ -410,7 +411,7 @@ class MediaFileUploadView(APIView):
                 Fileobj=video_file.file,  # Django уже предоставляет file-объект
                 Bucket=config("CLOUDFLARE_R2_BUCKET"),
                 Key="media/"+s3_key,
-                ExtraArgs={'ContentType': 'video/mp4'}
+                ExtraArgs={'ContentType': content_type}
             )
 
             file_url = f"{s3_key}"
