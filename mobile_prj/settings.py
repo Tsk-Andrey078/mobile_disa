@@ -1,11 +1,9 @@
 import logging
-import sentry_sdk.integrations.django
 import helpers.cloudflare.settings
 
 from pathlib import Path
 from datetime import timedelta
 from decouple import config
-from sentry_sdk.integrations.django import DjangoIntegration
 
 TWILIO_ACCOUNT_SID = config("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = config("TWILIO_AUTH_TOKEN")
@@ -124,30 +122,12 @@ STORAGES = {
     },
 }
 
-logging.basicConfig(level=logging.INFO)
-
-sentry_sdk.init(
-    dsn=config("SENTRY_DSN"),
-    debug=False,
-    integrations=[
-        DjangoIntegration(middleware_spans=True, signals_spans=True, ),
-    ],
-    environment="development",
-    traces_sample_rate=1.0,
-    send_default_pii=True,
-    auto_session_tracking=True
-)
-
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-        },
-        "sentry": {
-            "level": "ERROR",
-            "class": "sentry_sdk.integrations.logging.SentryHandler",
         },
     },
     "root": {
