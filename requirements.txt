@@ -9,6 +9,7 @@ fcm-django==2.2.1
 grpcio-status==1.69.0
 gunicorn==23.0.0
 uvicorn
+gevent
 importlib-metadata==8.0.0
 importlib-resources==6.4.0
 jaraco.text==3.12.1
