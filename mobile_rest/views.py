@@ -390,7 +390,7 @@ class GeneratePresignedUrlView(APIView):
         file_name = request.data.get("file_name")
         content_type = request.data.get("content_type", "video/mp4")  # По умолчанию видео
 
-        if not media_id or not file_name:
+        if not media_id or not file_name: 
             return Response({"error": "media_id и file_name обязательны"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
