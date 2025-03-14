@@ -403,6 +403,7 @@ class GeneratePresignedUrlView(APIView):
             aws_access_key_id=config("CLOUDFLARE_R2_ACCESS_KEY"),
             aws_secret_access_key=config("CLOUDFLARE_R2_SECRET_KEY"),
             endpoint_url=config("CLOUDFLARE_R2_BUCKET_ENDPOINT"),
+            region_name="auto",  # Укажи auto, если используешь Cloudflare R
         )
 
         # Уникальный ключ для хранения видео
