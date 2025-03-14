@@ -13,6 +13,7 @@ from drf_yasg import openapi
 import uuid
 import boto3
 import json
+import time
 from decouple import config
 from .twilio_service import send_verification_code, check_verification_code
 from .models import CustomUser, MediaFiles, MediaFile, MediaFileNews, News
@@ -433,7 +434,7 @@ class MediaFileUploadView(APIView):
                         part_number += 1
 
                         # **Отправляем keep-alive**
-                        yield b"\n"
+                        yield from b"\n"
 
                 # Завершаем загрузку файла
                 s3_client.complete_multipart_upload(
@@ -448,8 +449,9 @@ class MediaFileUploadView(APIView):
                 media_file.video_file.name = s3_key
                 media_file.save()
 
+                time.sleep(1)
                 response_data = json.dumps({"message": "Файл загружен", "file_url": s3_key})
-                yield response_data.encode("utf-8")
+                yield from response_data.encode("utf-8")
 
             except Exception as e:
                 # Если что-то пошло не так, отменяем загрузку
@@ -459,9 +461,11 @@ class MediaFileUploadView(APIView):
                     UploadId=upload_id,
                 )
                 error_data = json.dumps({"error": f"Ошибка загрузки в S3: {str(e)}"})
-                yield error_data.encode("utf-8")
+                yield from error_data.encode("utf-8")
 
-        return StreamingHttpResponse(upload_stream(), content_type="application/json")
+        response = StreamingHttpResponse(upload_stream(), content_type="application/json")
+        response["Connection"] = "keep-alive"
+        return response
 
 class MediaFilesDetailView(APIView):
     """
