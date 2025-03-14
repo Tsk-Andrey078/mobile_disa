@@ -389,12 +389,12 @@ class MediaFileUploadView(APIView):
         content_type = request.data.get("content-type")
 
         if not media_id or not video_file:
-            return Response({"error": "media_id и video обязательны"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "media_id и video обязательны"}, status=400)
 
         try:
             media_instance = MediaFiles.objects.get(id=int(media_id))
         except MediaFiles.DoesNotExist:
-            return Response({"error": "MediaFiles не найден"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "MediaFiles не найден"}, status=404)
 
         # Генерируем уникальное имя файла
         s3_key = f"video/{uuid.uuid4()}_{video_file.name}"
@@ -404,23 +404,19 @@ class MediaFileUploadView(APIView):
             "s3",
             aws_access_key_id=config("CLOUDFLARE_R2_ACCESS_KEY"),
             aws_secret_access_key=config("CLOUDFLARE_R2_SECRET_KEY"),
-            endpoint_url=config("CLOUDFLARE_R2_BUCKET_ENDPOINT")
+            endpoint_url=config("CLOUDFLARE_R2_BUCKET_ENDPOINT"),
         )
 
         def upload_stream():
             try:
-                chunk_size = 5 * 1024 * 1024  # 5MB
+                # **Открываем соединение с S3**
                 with video_file.file as f:
-                    for chunk in iter(lambda: f.read(chunk_size), b""):
-                        # **Пинг Keep-Alive**
-                        yield b"\n"  # Отправляем пустой байт, чтобы соединение не разрывалось
-
-                        s3_client.upload_fileobj(
-                            Fileobj=video_file.file,  # Django уже предоставляет file-объект
-                            Bucket=config("CLOUDFLARE_R2_BUCKET"),
-                            Key="media/"+s3_key,
-                            ExtraArgs={'ContentType': content_type}
-                        )
+                    s3_client.upload_fileobj(
+                        Fileobj=f,
+                        Bucket=config("CLOUDFLARE_R2_BUCKET"),
+                        Key="media/" + s3_key,
+                        ExtraArgs={"ContentType": content_type},
+                    )
 
                 # Сохраняем путь в базе
                 media_file = MediaFile.objects.create(media=media_instance)
