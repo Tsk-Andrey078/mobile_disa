@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from django.contrib.auth.hashers import make_password
+from django.core.exceptions import ObjectDoesNotExist
 from sentry_sdk import capture_exception
 from drf_yasg import openapi
 import uuid
@@ -381,23 +382,21 @@ class MediaFilesCreateView(APIView):
             return Response(MediaFilesSerializer(media_instance).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class MediaFileUploadView(APIView):
+class GeneratePresignedUrlView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         media_id = request.data.get("media_id")
-        video_file = request.FILES.get("video")
-        content_type = request.data.get("content-type", "application/octet-stream")  # Если не передан Content-Type, ставим дефолт
+        file_name = request.data.get("file_name")
+        content_type = request.data.get("content_type", "video/mp4")  # По умолчанию видео
 
-        if not media_id or not video_file:
-            return Response({"error": "media_id и video обязательны"}, status=status.HTTP_400_BAD_REQUEST)
+        if not media_id or not file_name:
+            return Response({"error": "media_id и file_name обязательны"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             media_instance = MediaFiles.objects.get(id=int(media_id))
-        except MediaFiles.DoesNotExist:
+        except ObjectDoesNotExist:
             return Response({"error": "MediaFiles не найден"}, status=status.HTTP_404_NOT_FOUND)
-
-        s3_key = f"video/{uuid.uuid4()}_{video_file.name}"
 
         s3_client = boto3.client(
             "s3",
@@ -406,55 +405,55 @@ class MediaFileUploadView(APIView):
             endpoint_url=config("CLOUDFLARE_R2_BUCKET_ENDPOINT"),
         )
 
+        # Уникальный ключ для хранения видео
+        s3_key = f"video/{uuid.uuid4()}_{file_name}"
+
         try:
-            chunk_size = 5 * 1024 * 1024  # 5MB - минимальный размер части
-            upload_id = s3_client.create_multipart_upload(
-                Bucket=config("CLOUDFLARE_R2_BUCKET"),
-                Key="media/" + s3_key,
-                ContentType=content_type,
-            )["UploadId"]
-
-            parts = []
-            part_number = 1
-
-            with video_file.file as f:
-                while True:
-                    chunk = f.read(chunk_size)
-                    if not chunk:
-                        break
-
-                    response = s3_client.upload_part(
-                        Bucket=config("CLOUDFLARE_R2_BUCKET"),
-                        Key="media/" + s3_key,
-                        PartNumber=part_number,
-                        UploadId=upload_id,
-                        Body=chunk,
-                    )
-
-                    parts.append({"ETag": response["ETag"], "PartNumber": part_number})
-                    part_number += 1
-
-            s3_client.complete_multipart_upload(
-                Bucket=config("CLOUDFLARE_R2_BUCKET"),
-                Key="media/" + s3_key,
-                UploadId=upload_id,
-                MultipartUpload={"Parts": parts},
+            presigned_url = s3_client.generate_presigned_url(
+                "put_object",
+                Params={
+                    "Bucket": config("CLOUDFLARE_R2_BUCKET"),
+                    "Key": "media/" + s3_key,
+                    "ContentType": content_type,
+                },
+                ExpiresIn=3600,  # URL действует 1 час
             )
 
-            # Сохраняем путь в базе
-            media_file = MediaFile.objects.create(media=media_instance)
-            media_file.video_file.name = s3_key
-            media_file.save()
-
-            return Response({"message": "Файл загружен"}, status=status.HTTP_200_OK)
+            return Response(
+                {"upload_url": presigned_url, "file_key": s3_key},
+                status=status.HTTP_200_OK,
+            )
 
         except Exception as e:
-            s3_client.abort_multipart_upload(
-                Bucket=config("CLOUDFLARE_R2_BUCKET"),
-                Key="media/" + s3_key,
-                UploadId=upload_id,
+            return Response(
+                {"error": f"Ошибка генерации URL: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-            return Response({"error": f"Ошибка загрузки в S3: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class ConfirmUploadView(APIView):
+    """
+    Этот эндпоинт вызывается клиентом после успешной загрузки файла
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        media_id = request.data.get("media_id")
+        file_key = request.data.get("file_key")
+
+        if not media_id or not file_key:
+            return Response({"error": "media_id и file_key обязательны"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            media_instance = MediaFiles.objects.get(id=int(media_id))
+        except ObjectDoesNotExist:
+            return Response({"error": "MediaFiles не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Сохраняем путь в базе
+        media_file = MediaFile.objects.create(media=media_instance)
+        media_file.video_file.name = file_key
+        media_file.save()
+
+        return Response({"message": "Файл успешно загружен"}, status=status.HTTP_200_OK)
 
 class MediaFilesDetailView(APIView):
     """
