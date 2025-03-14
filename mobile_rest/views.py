@@ -387,7 +387,7 @@ class MediaFileUploadView(APIView):
     def post(self, request, *args, **kwargs):
         media_id = request.data.get("media_id")
         video_file = request.FILES.get("video")
-        content_type = request.data.get("content-type")
+        content_type = request.data.get("content-type", "application/octet-stream")  # Если не передан Content-Type, ставим дефолт
 
         if not media_id or not video_file:
             return Response({"error": "media_id и video обязательны"}, status=status.HTTP_400_BAD_REQUEST)
@@ -406,66 +406,55 @@ class MediaFileUploadView(APIView):
             endpoint_url=config("CLOUDFLARE_R2_BUCKET_ENDPOINT"),
         )
 
-        def upload_stream():
-            try:
-                chunk_size = 5 * 1024 * 1024  # 5MB - минимальный размер части в multipart upload
-                upload_id = s3_client.create_multipart_upload(
-                    Bucket=config("CLOUDFLARE_R2_BUCKET"),
-                    Key="media/" + s3_key,
-                    ContentType=content_type,
-                )["UploadId"]
+        try:
+            chunk_size = 5 * 1024 * 1024  # 5MB - минимальный размер части
+            upload_id = s3_client.create_multipart_upload(
+                Bucket=config("CLOUDFLARE_R2_BUCKET"),
+                Key="media/" + s3_key,
+                ContentType=content_type,
+            )["UploadId"]
 
-                parts = []
-                part_number = 1
+            parts = []
+            part_number = 1
 
-                with video_file.file as f:
-                    for chunk in iter(lambda: f.read(chunk_size), b""):
-                        # Загружаем часть файла
-                        response = s3_client.upload_part(
-                            Bucket=config("CLOUDFLARE_R2_BUCKET"),
-                            Key="media/" + s3_key,
-                            PartNumber=part_number,
-                            UploadId=upload_id,
-                            Body=chunk,
-                        )
+            with video_file.file as f:
+                while True:
+                    chunk = f.read(chunk_size)
+                    if not chunk:
+                        break
 
-                        # Сохраняем ETag части
-                        parts.append({"ETag": response["ETag"], "PartNumber": part_number})
-                        part_number += 1
+                    response = s3_client.upload_part(
+                        Bucket=config("CLOUDFLARE_R2_BUCKET"),
+                        Key="media/" + s3_key,
+                        PartNumber=part_number,
+                        UploadId=upload_id,
+                        Body=chunk,
+                    )
 
-                        # **Отправляем keep-alive**
-                        yield from b"\n"
+                    parts.append({"ETag": response["ETag"], "PartNumber": part_number})
+                    part_number += 1
 
-                # Завершаем загрузку файла
-                s3_client.complete_multipart_upload(
-                    Bucket=config("CLOUDFLARE_R2_BUCKET"),
-                    Key="media/" + s3_key,
-                    UploadId=upload_id,
-                    MultipartUpload={"Parts": parts},
-                )
+            s3_client.complete_multipart_upload(
+                Bucket=config("CLOUDFLARE_R2_BUCKET"),
+                Key="media/" + s3_key,
+                UploadId=upload_id,
+                MultipartUpload={"Parts": parts},
+            )
 
-                # Сохраняем путь в базе
-                media_file = MediaFile.objects.create(media=media_instance)
-                media_file.video_file.name = s3_key
-                media_file.save()
+            # Сохраняем путь в базе
+            media_file = MediaFile.objects.create(media=media_instance)
+            media_file.video_file.name = s3_key
+            media_file.save()
 
-                time.sleep(1)
-                response_data = json.dumps({"message": "Файл загружен", "file_url": s3_key})
-                yield from response_data.encode("utf-8")
+            return Response({"message": "Файл загружен"}, status=status.HTTP_200_OK)
 
-            except Exception as e:
-                # Если что-то пошло не так, отменяем загрузку
-                s3_client.abort_multipart_upload(
-                    Bucket=config("CLOUDFLARE_R2_BUCKET"),
-                    Key="media/" + s3_key,
-                    UploadId=upload_id,
-                )
-                error_data = json.dumps({"error": f"Ошибка загрузки в S3: {str(e)}"})
-                yield from error_data.encode("utf-8")
-
-        response = StreamingHttpResponse(upload_stream(), content_type="application/json")
-        response["Connection"] = "keep-alive"
-        return response
+        except Exception as e:
+            s3_client.abort_multipart_upload(
+                Bucket=config("CLOUDFLARE_R2_BUCKET"),
+                Key="media/" + s3_key,
+                UploadId=upload_id,
+            )
+            return Response({"error": f"Ошибка загрузки в S3: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class MediaFilesDetailView(APIView):
     """
