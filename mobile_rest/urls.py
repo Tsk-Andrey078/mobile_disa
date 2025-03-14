@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import SendVerificationCodeView, VerifyCodeAndRegisterView, CustomTokenObtainPairView, RegisterDeviceView, MediaFileUploadView, MediaFilesListView, MediaFilesDetailView, GetNewsListView, GetNewsView, PostNewsView, CheckToken, MediaFilesCreateView, UpdateNewsView, DeleteNewsView, RequestPasswordResetView, ConfirmPasswordResetView, GeneratePresignedUrlView, ConfirmUploadView
+from .views import SendVerificationCodeView, VerifyCodeAndRegisterView, CustomTokenObtainPairView, RegisterDeviceView, MediaFilesListView, MediaFilesDetailView, GetNewsListView, GetNewsView, PostNewsView, CheckToken, MediaFilesCreateView, UpdateNewsView, DeleteNewsView, RequestPasswordResetView, ConfirmPasswordResetView, GeneratePresignedUrlView, ConfirmUploadView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
