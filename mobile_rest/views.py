@@ -3,6 +3,7 @@ from fcm_django.models import FCMDevice
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
+from django.http import StreamingHttpResponse
 from rest_framework.views import APIView
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
@@ -11,6 +12,7 @@ from sentry_sdk import capture_exception
 from drf_yasg import openapi
 import uuid
 import boto3
+import json
 from decouple import config
 from .twilio_service import send_verification_code, check_verification_code
 from .models import CustomUser, MediaFiles, MediaFile, MediaFileNews, News
@@ -377,22 +379,22 @@ class MediaFilesCreateView(APIView):
             media_instance = serializer.save()
             return Response(MediaFilesSerializer(media_instance).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
 class MediaFileUploadView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        media_id = request.data.get('media_id')
-        video_file = request.FILES.get('video')
-        content_type = request.data.get('content-type')
+        media_id = request.data.get("media_id")
+        video_file = request.FILES.get("video")
+        content_type = request.data.get("content-type")
 
         if not media_id or not video_file:
-            return Response({'error': 'media_id и video обязательны'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "media_id и video обязательны"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             media_instance = MediaFiles.objects.get(id=int(media_id))
         except MediaFiles.DoesNotExist:
-            return Response({'error': 'MediaFiles не найден'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "MediaFiles не найден"}, status=status.HTTP_404_NOT_FOUND)
 
         # Генерируем уникальное имя файла
         s3_key = f"video/{uuid.uuid4()}_{video_file.name}"
@@ -405,27 +407,34 @@ class MediaFileUploadView(APIView):
             endpoint_url=config("CLOUDFLARE_R2_BUCKET_ENDPOINT")
         )
 
-        try:
-            # **ЗАГРУЖАЕМ ПОТОКОМ** в S3
-            s3_client.upload_fileobj(
-                Fileobj=video_file.file,  # Django уже предоставляет file-объект
-                Bucket=config("CLOUDFLARE_R2_BUCKET"),
-                Key="media/"+s3_key,
-                ExtraArgs={'ContentType': content_type}
-            )
+        def upload_stream():
+            try:
+                chunk_size = 5 * 1024 * 1024  # 5MB
+                with video_file.file as f:
+                    for chunk in iter(lambda: f.read(chunk_size), b""):
+                        # **Пинг Keep-Alive**
+                        yield b"\n"  # Отправляем пустой байт, чтобы соединение не разрывалось
 
-            file_url = f"{s3_key}"
+                        s3_client.upload_fileobj(
+                            Fileobj=video_file.file,  # Django уже предоставляет file-объект
+                            Bucket=config("CLOUDFLARE_R2_BUCKET"),
+                            Key="media/"+s3_key,
+                            ExtraArgs={'ContentType': content_type}
+                        )
 
-            # Сохраняем путь в базе
-            media_file = MediaFile.objects.create(media=media_instance)
-            media_file.video_file.name = s3_key
-            media_file.save()
+                # Сохраняем путь в базе
+                media_file = MediaFile.objects.create(media=media_instance)
+                media_file.video_file.name = s3_key
+                media_file.save()
 
-            return Response({'message': 'Файл загружен', 'file_url': file_url}, status=status.HTTP_201_CREATED)
+                response_data = json.dumps({"message": "Файл загружен", "file_url": s3_key})
+                yield response_data.encode("utf-8")
 
-        except Exception as e:
-            return Response({'error': f'Ошибка загрузки в S3: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            except Exception as e:
+                error_data = json.dumps({"error": f"Ошибка загрузки в S3: {str(e)}"})
+                yield error_data.encode("utf-8")
 
+        return StreamingHttpResponse(upload_stream(), content_type="application/json")
 
 class MediaFilesDetailView(APIView):
     """
