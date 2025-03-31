@@ -1,8 +1,10 @@
 from django.urls import reverse
-from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from .models import News, MediaFiles
+from django.test import TestCase
+from django.contrib.auth import get_user_model
+from fcm_django.models import FCMDevice
 from unittest.mock import patch
 
 User = get_user_model()
@@ -459,3 +461,37 @@ class ConfirmPasswordResetViewTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
         mock_check.assert_called_once_with(self.existing_user.phone_number, "wrong_code")
+
+
+class MediaFilesNotificationTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create(phone_number="1234567890", full_name="Test User")
+        FCMDevice.objects.create(user=self.user, registration_id="user_token", type="android")
+
+        self.media_file = MediaFiles.objects.create(
+            user=self.user,
+            city="City",
+            street="Street",
+            description="Test description",
+            was_at_date="2025-03-28",
+            was_at_time="12:00:00",
+            status="Waiting"
+        )
+
+    @patch("firebase_admin.messaging.send_multicast")
+    def test_status_done_notification(self, mock_send):
+        # Обновляем статус на "Done" и проверяем, что send_multicast вызывается пользователя
+        self.media_file.status = "Done"
+        self.media_file.save()
+        self.assertTrue(mock_send.called)
+        self.assertEqual(mock_send.call_count, 1)
+
+    @patch("firebase_admin.messaging.send_multicast")
+    def test_status_fail_notification(self, mock_send):
+        # Устанавливаем дополнительные данные для ошибки и обновляем статус на "Fail"
+        self.media_file.error_code = "ERR001"
+        self.media_file.error_text = "Ошибка загрузки файла"
+        self.media_file.status = "Fail"
+        self.media_file.save()
+        self.assertTrue(mock_send.called)
+        self.assertEqual(mock_send.call_count, 1)
