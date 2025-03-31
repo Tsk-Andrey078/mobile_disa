@@ -6,7 +6,7 @@ from twilio.rest import Client
 from decouple import config
 from twilio.base.exceptions import TwilioRestException
 
-# Получаем учетные данные из .env
+# Получаем учетные данные из .env.example
 account_sid = config('TWILIO_ACCOUNT_SID')
 auth_token = config('TWILIO_AUTH_TOKEN')
 verify_service_sid = config('TWILIO_VERIFY_SERVICE_SID')
