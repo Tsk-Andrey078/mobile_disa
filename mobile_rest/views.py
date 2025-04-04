@@ -15,9 +15,10 @@ import uuid
 import boto3
 import json
 import time
+import random
 from decouple import config
-from .twilio_service import send_verification_code, check_verification_code
-from .models import CustomUser, MediaFiles, MediaFile, MediaFileNews, News
+from .sms_service import send_verification_code
+from .models import CustomUser, MediaFiles, MediaFile, MediaFileNews, News, VerificationCode
 from .serializer import (
     CustomTokenObtainPairSerializer,
     MediaFilesSerializer,
@@ -137,11 +138,13 @@ class ConfirmPasswordResetView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        if not check_verification_code(phone_number, code):
-            return Response(
-                {"error": "Неверный код подтверждения."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        verification_record = VerificationCode.objects.filter(phone_number=phone_number).first()
+
+        if not verification_record or verification_record.code != code or verification_record.is_expired():
+            return Response({"error": "Неверный или просроченный код"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Удаляем использованный код
+        verification_record.delete()
 
         try:
             user.password = make_password(new_password)
@@ -163,9 +166,6 @@ class ConfirmPasswordResetView(APIView):
 # ===================================
 
 class SendVerificationCodeView(APIView):
-    """
-    Отправляет код подтверждения на указанный номер телефона.
-    """
 
     @swagger_auto_schema(
         operation_description="Отправка кода подтверждения на номер телефона",
@@ -182,67 +182,51 @@ class SendVerificationCodeView(APIView):
         responses={
             200: 'Код отправлен успешно',
             400: 'Номер телефона обязателен',
+            409: 'Пользователь уже существует',
             500: 'Ошибка при отправке кода'
         }
     )
     def post(self, request):
         phone_number = request.data.get('phone_number')
+
         if not phone_number:
-            return Response(
-                {"error": "Номер телефона обязателен"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Номер телефона обязателен"}, status=status.HTTP_400_BAD_REQUEST)
 
-        result = send_verification_code(phone_number)
-        if 'status' in result:
-            return Response(
-                {"message": "Код подтверждения успешно отправлен"},
-                status=status.HTTP_200_OK
-            )
+        if CustomUser.objects.filter(phone_number=phone_number).exists():
+            return Response({"error": "Пользователь с таким номером уже существует"}, status=status.HTTP_409_CONFLICT)
 
-        return Response(
-            {
-                "error": result.get("error", "Неизвестная ошибка"),
-                "message": result.get("message", "Ошибка при отправке кода"),
-                "error_code": result.get("error_code", "Неизвестный код ошибки")
-            },
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        # Генерируем 4-значный код
+        verification_code = str(random.randint(100000, 999999))
+
+        # Удаляем старый код (если есть) и создаем новый
+        VerificationCode.objects.filter(phone_number=phone_number).delete()
+        VerificationCode.objects.create(phone_number=phone_number, code=verification_code)
+
+        result = send_verification_code(phone_number, verification_code)
+
+        if result['status'] == 'success':
+            return Response({"message": "Код подтверждения успешно отправлен"}, status=status.HTTP_200_OK)
+
+        return Response({"error": result.get("message", "Ошибка при отправке кода")}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class VerifyCodeAndRegisterView(APIView):
-    """
-    Проверяет код подтверждения и регистрирует нового пользователя.
-    """
 
     @swagger_auto_schema(
         operation_description="Проверка кода и регистрация нового пользователя",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                'phone_number': openapi.Schema(
-                    type=openapi.TYPE_STRING,
-                    description="Номер телефона"
-                ),
-                'code': openapi.Schema(
-                    type=openapi.TYPE_STRING,
-                    description="Код подтверждения из SMS"
-                ),
-                'full_name': openapi.Schema(
-                    type=openapi.TYPE_STRING,
-                    description="ФИО или имя пользователя"
-                ),
-                'password': openapi.Schema(
-                    type=openapi.TYPE_STRING,
-                    description="Пароль пользователя"
-                )
+                'phone_number': openapi.Schema(type=openapi.TYPE_STRING, description="Номер телефона"),
+                'code': openapi.Schema(type=openapi.TYPE_STRING, description="Код подтверждения из SMS"),
+                'full_name': openapi.Schema(type=openapi.TYPE_STRING, description="ФИО пользователя"),
+                'password': openapi.Schema(type=openapi.TYPE_STRING, description="Пароль пользователя"),
             },
-            required=['phone_number', 'code', 'password']
+            required=['phone_number', 'code', 'full_name', 'password']
         ),
         responses={
             201: 'Пользователь успешно зарегистрирован',
             400: 'Неверный код или обязательные поля отсутствуют',
-            409: 'Пользователь уже существует',
             500: 'Ошибка при создании пользователя'
         }
     )
@@ -252,40 +236,28 @@ class VerifyCodeAndRegisterView(APIView):
         full_name = request.data.get('full_name')
         password = request.data.get('password')
 
-        if not phone_number or not code or not full_name or not password:
-            return Response(
-                {"error": "Необходимо указать номер телефона, код, ФИО и пароль"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        if not all([phone_number, code, full_name, password]):
+            return Response({"error": "Обязательные поля отсутствуют"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            if not check_verification_code(phone_number, code):
-                return Response(
-                    {"error": "Указанный код подтверждения неверен"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            verification_record = VerificationCode.objects.filter(phone_number=phone_number).first()
 
-            if CustomUser.objects.filter(phone_number=phone_number).exists():
-                return Response(
-                    {"message": "Пользователь с таким номером уже существует"},
-                    status=status.HTTP_409_CONFLICT
-                )
+            if not verification_record or verification_record.code != code or verification_record.is_expired():
+                return Response({"error": "Неверный или просроченный код"}, status=status.HTTP_400_BAD_REQUEST)
 
-            CustomUser.objects.create(
+            # Удаляем использованный код
+            verification_record.delete()
+
+            user = CustomUser.objects.create(
                 phone_number=phone_number,
                 full_name=full_name,
-                password=make_password(password)
+                password=make_password(password),
             )
-            return Response(
-                {"message": "Пользователь успешно зарегистрирован"},
-                status=status.HTTP_201_CREATED
-            )
+
+            return Response({"message": "Пользователь успешно зарегистрирован"}, status=status.HTTP_201_CREATED)
+
         except Exception as e:
-            capture_exception(e)
-            return Response(
-                {"error": f"Ошибка при создании пользователя: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": f"Ошибка при создании пользователя: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
