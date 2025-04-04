@@ -1,6 +1,6 @@
 from django.contrib.auth.models import AbstractUser, Group, Permission, BaseUserManager
 from django.db import models
-
+from django.utils.timezone import now
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, phone_number, password = None, **extra_fields):
@@ -53,6 +53,14 @@ class CustomUser(AbstractUser):
     def __str__(self):
         return self.phone_number
 
+class VerificationCode(models.Model):
+    phone_number = models.CharField(max_length=20, unique=True)
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_expired(self):
+        # Код действителен 5 минут
+        return (now() - self.created_at).seconds > 300
 
 class MediaFile(models.Model):
     id = models.AutoField(primary_key = True)
