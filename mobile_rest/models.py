@@ -86,5 +86,5 @@ class MediaFileNews(models.Model):
 class News(models.Model):
     id = models.AutoField(primary_key = True)
     title = models.CharField(max_length=512)
-    text = models.TextField()
+    text = models.JSONField()
     created_at = models.DateTimeField(auto_now_add = True)
