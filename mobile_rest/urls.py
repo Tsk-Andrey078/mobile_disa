@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import SendVerificationCodeView, VerifyCodeAndRegisterView, CustomTokenObtainPairView, RegisterDeviceView, MediaFilesListView, MediaFilesDetailView, GetNewsListView, GetNewsView, PostNewsView, CheckToken, MediaFilesCreateView, UpdateNewsView, DeleteNewsView, RequestPasswordResetView, ConfirmPasswordResetView, GeneratePresignedUrlView, ConfirmUploadView
+from .views import SendVerificationCodeView, VerifyCodeAndRegisterView, CustomTokenObtainPairView, RegisterDeviceView, MediaFilesListView, MediaFilesDetailView, GetNewsListView, GetNewsView, PostNewsView, CheckToken, MediaFilesCreateView, UpdateNewsView, DeleteNewsView, RequestPasswordResetView, ConfirmPasswordResetView, GeneratePresignedUrlView, ConfirmUploadView, MediaFileNewsUpdateAPIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
@@ -41,9 +41,9 @@ urlpatterns = [
     path('news/upload/', PostNewsView.as_view(), name='news-upload'),
     path('news/detail/', GetNewsView.as_view(), name='news-detail'),
     path('news/list/', GetNewsListView.as_view(), name='news-list'),
-
     path('news/update/', UpdateNewsView.as_view(), name='news-update'),
     path('news/delete/', DeleteNewsView.as_view(), name='news-delete'),
+    path('news/update-img/', MediaFileNewsUpdateAPIView.as_view(), name='news-img-update'),
 
     path('auth/request_password_reset/', RequestPasswordResetView.as_view(), name='request_password_reset'),
     path('auth/confirm_password_reset/', ConfirmPasswordResetView.as_view(), name='confirm_password_reset'),

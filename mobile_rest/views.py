@@ -10,6 +10,7 @@ from drf_yasg.utils import swagger_auto_schema
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ObjectDoesNotExist
 from sentry_sdk import capture_exception
+from django.shortcuts import get_object_or_404
 from drf_yasg import openapi
 import uuid
 import boto3
@@ -22,7 +23,8 @@ from .models import CustomUser, MediaFiles, MediaFile, MediaFileNews, News, Veri
 from .serializer import (
     CustomTokenObtainPairSerializer,
     MediaFilesSerializer,
-    NewsSerializer
+    NewsSerializer,
+    MediaFileNewsSerializer
 )
 
 
@@ -719,6 +721,22 @@ class DeleteNewsView(APIView):
                 {"error": "Новость не найдена"},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+class MediaFileNewsUpdateAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [FormParser, MultiPartParser]
+
+    def patch(self, request):
+        pk = request.query_params.get('id')
+        if not pk:
+            return Response({'error': 'Missing "id" in query parameters.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        instance = get_object_or_404(MediaFileNews, pk=pk)
+        serializer = MediaFileNewsSerializer(instance, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ===================================
