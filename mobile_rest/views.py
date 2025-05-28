@@ -568,7 +568,7 @@ class GetNewsView(APIView):
     """
     Получение одной новости по её ID.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     @swagger_auto_schema(
         operation_description="Получение новости по ID",
