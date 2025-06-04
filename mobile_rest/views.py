@@ -347,7 +347,7 @@ class MediaFilesCreateView(APIView):
             'description': request.data.get('description'),
             'was_at_date': request.data.get('was_at_date'),
             'was_at_time': request.data.get('was_at_time'),
-            'status': 'Waiting',
+            'status': '3',
         }
         serializer = MediaFilesSerializer(data=data)
 
