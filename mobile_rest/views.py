@@ -515,9 +515,9 @@ class MediaFilesListView(APIView):
             )
 
         if query_type == "user":
-            media_qs = MediaFiles.objects.filter(user=request.user)[:limit_value]
+            media_qs = MediaFiles.objects.filter(user=request.user).order_by('-created_at')[:limit_value]
         elif query_type == "all":
-            media_qs = MediaFiles.objects.all()[:limit_value]
+            media_qs = MediaFiles.objects.all().order_by('-created_at')[:limit_value]
         else:
             return Response(
                 {"error": 'Допустимые значения "type": "user" или "all"'},
