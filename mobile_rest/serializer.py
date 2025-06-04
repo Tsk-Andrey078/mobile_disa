@@ -34,7 +34,7 @@ class MediaFilesSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MediaFiles
-        fields = ['id', 'user', 'city', 'street', 'description', 'was_at_date', 'was_at_time', 'uploaded_at', 'videos']
+        fields = ['id', 'user', 'city', 'street', 'description', 'was_at_date', 'was_at_time', 'uploaded_at', 'videos', 'status']
 
     def get_videos(self, obj):
         # Возвращаем сериализованные видеофайлы, связанные с текущей записью
