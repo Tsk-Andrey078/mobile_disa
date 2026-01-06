@@ -13,8 +13,8 @@ SECRET_KEY = "django-insecure-#uied7d2d4va9@h&-q^qo)v^$o#5mmgx^_8nn8%fw@!b)n@)0k
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "m.foxminded.space"]
-CSRF_TRUSTED_ORIGINS = ["https://m.foxminded.space"]
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "m.ispark.kz"]
+CSRF_TRUSTED_ORIGINS = ["https://m.ispark.kz"]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
